@@ -1,0 +1,12 @@
+export { AdminDashboard } from './Dashboard';
+export { AdminAnalytics } from './Analytics';
+export { AdminProjects } from './Projects';
+export { AdminTasks } from './Tasks';
+export { AdminEmployees } from './Employees';
+export { AdminClients } from './Clients';
+export { AdminInvites } from './Invites';
+export { AdminReports } from './Reports';
+export { AdminNotifications } from './Notifications';
+export { AdminSettings } from './Settings';
+export { ClientDetails } from './ClientDetails';
+export { ProjectDetails } from './ProjectDetails';
