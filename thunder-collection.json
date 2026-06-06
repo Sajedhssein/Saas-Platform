@@ -1,0 +1,361 @@
+{
+  "client": "Thunder Client",
+  "collectionName": "SaaS Platform API",
+  "dateExported": "2026-05-12",
+  "version": "1.1",
+  "folders": [
+    {
+      "name": "Auth",
+      "requests": [
+        {
+          "name": "Register Company Admin",
+          "method": "POST",
+          "url": "http://localhost:8000/api/auth/register",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "company_name": "My Tech Company",
+            "first_name": "John",
+            "last_name": "Doe",
+            "email": "admin@company.com",
+            "password": "Password123"
+          }
+        },
+        {
+          "name": "Login",
+          "method": "POST",
+          "url": "http://localhost:8000/api/auth/login",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "email": "admin@company.com",
+            "password": "Password123"
+          }
+        },
+        {
+          "name": "Get Current User",
+          "method": "GET",
+          "url": "http://localhost:8000/api/auth/me",
+          "headers": {
+            "Authorization": "Bearer YOUR_TOKEN_HERE"
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "method": "POST",
+          "url": "http://localhost:8000/api/auth/refresh",
+          "headers": {
+            "Authorization": "Bearer YOUR_TOKEN_HERE"
+          }
+        },
+        {
+          "name": "Logout",
+          "method": "POST",
+          "url": "http://localhost:8000/api/auth/logout",
+          "headers": {
+            "Authorization": "Bearer YOUR_TOKEN_HERE"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Create Users",
+      "requests": [
+        {
+          "name": "Create Employee",
+          "method": "POST",
+          "url": "http://localhost:8000/api/admin/employees",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "name": "Jane Smith",
+            "email": "jane@company.com",
+            "password": "Password123",
+            "phone": "123-456-7890"
+          }
+        },
+        {
+          "name": "Create Client",
+          "method": "POST",
+          "url": "http://localhost:8000/api/admin/clients",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "name": "Client Company",
+            "email": "contact@clientco.com",
+            "password": "Password123",
+            "company_name": "Client Corporation",
+            "phone": "987-654-3210"
+          }
+        },
+        {
+          "name": "Create User",
+          "method": "POST",
+          "url": "http://localhost:8000/api/admin/users",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "name": "New User",
+            "email": "newuser@company.com",
+            "password": "Password123",
+            "role": "employee",
+            "phone": "123-456-7890"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - User Management",
+      "requests": [
+        {
+          "name": "List Users (Active)",
+          "method": "GET",
+          "url": "http://localhost:8000/api/admin/users?status=active",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN"
+          }
+        },
+        {
+          "name": "List Users (Filter by Role)",
+          "method": "GET",
+          "url": "http://localhost:8000/api/admin/users?role=employee",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN"
+          }
+        },
+        {
+          "name": "Get User Details",
+          "method": "GET",
+          "url": "http://localhost:8000/api/admin/users/USER_ID",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN"
+          }
+        },
+        {
+          "name": "Delete User",
+          "method": "DELETE",
+          "url": "http://localhost:8000/api/admin/users/USER_ID",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN"
+          }
+        },
+        {
+          "name": "Assign Roles",
+          "method": "PUT",
+          "url": "http://localhost:8000/api/admin/users/USER_ID/roles",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "roles": ["employee", "client"]
+          }
+        },
+        {
+          "name": "Deactivate User",
+          "method": "PATCH",
+          "url": "http://localhost:8000/api/admin/users/USER_ID/deactivate",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN"
+          }
+        },
+        {
+          "name": "Activate User",
+          "method": "PATCH",
+          "url": "http://localhost:8000/api/admin/users/USER_ID/activate",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Project Management",
+      "requests": [
+        {
+          "name": "Create Project",
+          "method": "POST",
+          "url": "http://localhost:8000/api/admin/projects",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "name": "Website Redesign",
+            "description": "Redesign the company website.",
+            "status": "active",
+            "start_date": "2026-05-15",
+            "end_date": "2026-07-30",
+            "progress": 10,
+            "budget": 15000
+          }
+        },
+        {
+          "name": "List Projects",
+          "method": "GET",
+          "url": "http://localhost:8000/api/admin/projects",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN"
+          }
+        },
+        {
+          "name": "Get Project Details",
+          "method": "GET",
+          "url": "http://localhost:8000/api/admin/projects/PROJECT_ID",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN"
+          }
+        },
+        {
+          "name": "Update Project",
+          "method": "PUT",
+          "url": "http://localhost:8000/api/admin/projects/PROJECT_ID",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "name": "Website Redesign Updated",
+            "progress": 25,
+            "budget": 18000
+          }
+        },
+        {
+          "name": "Delete Project",
+          "method": "DELETE",
+          "url": "http://localhost:8000/api/admin/projects/PROJECT_ID",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Task Management",
+      "requests": [
+        {
+          "name": "Create Task",
+          "method": "POST",
+          "url": "http://localhost:8000/api/admin/tasks",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "project_id": "PROJECT_ID",
+            "title": "Design Landing Page",
+            "description": "Build the main marketing landing page.",
+            "priority": "high",
+            "deadline": "2026-06-15 12:00:00",
+            "estimated_hours": 20
+          }
+        },
+        {
+          "name": "List Tasks",
+          "method": "GET",
+          "url": "http://localhost:8000/api/admin/tasks",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN"
+          }
+        },
+        {
+          "name": "List Tasks By Project",
+          "method": "GET",
+          "url": "http://localhost:8000/api/admin/tasks?project_id=PROJECT_ID",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN"
+          }
+        },
+        {
+          "name": "Get Task Details",
+          "method": "GET",
+          "url": "http://localhost:8000/api/admin/tasks/TASK_ID",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN"
+          }
+        },
+        {
+          "name": "Assign Task Employees",
+          "method": "POST",
+          "url": "http://localhost:8000/api/admin/tasks/TASK_ID/assign",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "assignees": [
+              {
+                "id": "EMPLOYEE_ID",
+                "role": "assignee"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Update Task Status",
+          "method": "PATCH",
+          "url": "http://localhost:8000/api/admin/tasks/TASK_ID/status",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "status": "in_progress"
+          }
+        },
+        {
+          "name": "Upload Task File",
+          "method": "POST",
+          "url": "http://localhost:8000/api/admin/tasks/TASK_ID/files",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN"
+          },
+          "body": {
+            "file": "<select file>"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Role Management",
+      "requests": [
+        {
+          "name": "List Roles",
+          "method": "GET",
+          "url": "http://localhost:8000/api/admin/roles",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN"
+          }
+        },
+        {
+          "name": "Create Role",
+          "method": "POST",
+          "url": "http://localhost:8000/api/admin/roles",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "name": "employee"
+          }
+        },
+        {
+          "name": "Delete Role",
+          "method": "DELETE",
+          "url": "http://localhost:8000/api/admin/roles/ROLE_ID",
+          "headers": {
+            "Authorization": "Bearer YOUR_ADMIN_TOKEN"
+          }
+        }
+      ]
+    }
+  ]
+}
