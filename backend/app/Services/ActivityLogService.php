@@ -330,6 +330,14 @@ class ActivityLogService
         return static::logStructured('project_completed', $user, null, $project, $metadata, $description);
     }
 
+    public static function logProjectUpdated(string|User $user, string|Project $project, array $metadata = [], ?string $description = null): ActivityLog
+    {
+        $user = static::resolveUser($user);
+        $project = static::resolveProject($project);
+
+        return static::logStructured('project_updated', $user, null, $project, $metadata, $description);
+    }
+
     public static function logInviteSent(string|User $user, Invite $invite, array $metadata = [], ?string $description = null): ActivityLog
     {
         $user = static::resolveUser($user);
@@ -368,6 +376,40 @@ class ActivityLogService
         $metadata = array_merge($metadata, ['entity_type' => 'Report', 'entity_id' => $report->id, 'report_title' => $report->title]);
 
         return static::logStructured('report_generated', $user, null, null, $metadata, $description ?? "{$user->name} generated report \"{$report->title}\"");
+    }
+
+    public static function logReportViewed(string|User $user, Report $report, array $metadata = [], ?string $description = null): ActivityLog
+    {
+        $user = static::resolveUser($user);
+        $metadata = array_merge($metadata, ['entity_type' => 'Report', 'entity_id' => $report->id, 'report_title' => $report->title]);
+
+        return static::logStructured('report_viewed', $user, null, null, $metadata, $description ?? "{$user->name} viewed report \"{$report->title}\"");
+    }
+
+    public static function logUserActivated(string|User $actor, User $target, array $metadata = [], ?string $description = null): ActivityLog
+    {
+        $actor = static::resolveUser($actor);
+        $role = static::primaryRoleName($target);
+        $metadata = array_merge($metadata, ['entity_type' => 'User', 'entity_id' => $target->id, 'target_user_name' => $target->name, 'target_role' => $role]);
+
+        return static::logStructured('user_activated', $actor, null, null, $metadata, $description ?? "{$actor->name} activated {$role} {$target->name}");
+    }
+
+    public static function logUserDeactivated(string|User $actor, User $target, array $metadata = [], ?string $description = null): ActivityLog
+    {
+        $actor = static::resolveUser($actor);
+        $role = static::primaryRoleName($target);
+        $metadata = array_merge($metadata, ['entity_type' => 'User', 'entity_id' => $target->id, 'target_user_name' => $target->name, 'target_role' => $role]);
+
+        return static::logStructured('user_deactivated', $actor, null, null, $metadata, $description ?? "{$actor->name} deactivated {$role} {$target->name}");
+    }
+
+    public static function logClientCreated(string|User $actor, User $client, array $metadata = [], ?string $description = null): ActivityLog
+    {
+        $actor = static::resolveUser($actor);
+        $metadata = array_merge($metadata, ['entity_type' => 'User', 'entity_id' => $client->id, 'client_name' => $client->name, 'client_email' => $client->email]);
+
+        return static::logStructured('client_created', $actor, null, null, $metadata, $description ?? "{$actor->name} created client {$client->name}");
     }
 
     private static function logLegacy(
@@ -443,9 +485,23 @@ class ActivityLogService
             'invite_revoked' => sprintf('%s revoked invite to %s', $user->name, $metadata['invite_email'] ?? 'a recipient'),
             'invite_accepted' => sprintf('%s accepted invite', $user->name),
             'project_created' => $project ? sprintf('%s created project "%s"', $user->name, $project->name) : 'Project created',
+            'project_updated' => $project ? sprintf('%s updated project "%s"', $user->name, $project->name) : 'Project updated',
             'project_completed' => $project ? sprintf('Project "%s" completed', $project->name) : 'Project completed',
             'report_generated' => sprintf('%s generated report "%s"', $user->name, $metadata['report_title'] ?? $project?->name ?? 'Report'),
+            'report_viewed' => sprintf('%s viewed report "%s"', $user->name, $metadata['report_title'] ?? 'Report'),
+            'user_activated' => sprintf('%s activated %s %s', $user->name, $metadata['target_role'] ?? 'user', $metadata['target_user_name'] ?? ''),
+            'user_deactivated' => sprintf('%s deactivated %s %s', $user->name, $metadata['target_role'] ?? 'user', $metadata['target_user_name'] ?? ''),
+            'client_created' => sprintf('%s created client %s', $user->name, $metadata['client_name'] ?? ''),
             default => Str::headline(str_replace('_', ' ', $action)),
         };
+    }
+
+    private static function primaryRoleName(User $user): string
+    {
+        $role = $user->relationLoaded('roles')
+            ? $user->roles->pluck('name')->first()
+            : $user->roles()->pluck('name')->first();
+
+        return strtolower((string) ($role ?: 'user'));
     }
 }

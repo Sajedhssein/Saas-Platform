@@ -66,6 +66,7 @@ const normalizeComment = (comment: TaskComment | null | undefined): TaskComment 
         task_id: comment?.task_id,
         message: text,
         content: comment?.content ?? text,
+        attachment: comment?.attachment ?? null,
         user_id: comment?.user_id,
         user: comment?.user ?? null,
         author: comment?.author ?? null,
@@ -238,7 +239,7 @@ const toTaskFile = (payload: unknown): TaskFile | null => {
             (typeof record.download_url === 'string' && record.download_url) ||
             (typeof record.file_url === 'string' && record.file_url) ||
             null,
-        size: typeof record.size === 'number' ? record.size : null,
+        size: typeof record.size === 'number' ? record.size : typeof record.file_size === 'number' ? record.file_size : null,
         mime_type:
             (typeof record.mime_type === 'string' && record.mime_type) ||
             (typeof record.file_type === 'string' && record.file_type) ||
@@ -267,7 +268,7 @@ export const taskService = {
      */
     getTask: async (id: string): Promise<Task> => {
         try {
-            const response = await api.get<TaskResponseEnvelope>(`${TASK_BASE_PATH}/${id}`);
+            const response = await api.get<TaskResponseEnvelope>(`/tasks/${id}`);
             return response.data.data;
         } catch (error: unknown) {
             throw makeError(extractErrorMessage(error, 'Failed to fetch task'));
@@ -410,15 +411,25 @@ export const taskService = {
         }
     },
 
-    createTaskComment: async (taskId: string, data: CreateTaskCommentPayload): Promise<TaskComment> => {
+    createTaskComment: async (taskId: string, data: CreateTaskCommentPayload & { attachment?: File | null }): Promise<TaskComment> => {
         try {
+            const hasAttachment = data.attachment instanceof File;
+            const requestPayload = hasAttachment
+                ? (() => {
+                    const formData = new FormData();
+                    formData.append('content', data.content);
+                    formData.append('attachment', data.attachment as File);
+                    return formData;
+                })()
+                : { content: data.content };
+
             const response = await api.post<TaskCommentResponseEnvelope | ApiEnvelope<TaskComment>>(
                 TASK_COMMENTS_PATH(taskId),
-                { content: data.content }
+                requestPayload
             );
 
-            const payload = response.data;
-            const comment = getEnvelopeData<TaskComment>(payload);
+            const responsePayload = response.data;
+            const comment = getEnvelopeData<TaskComment>(responsePayload);
 
             if (comment) {
                 notifyTaskMutation();
@@ -483,7 +494,7 @@ export const taskService = {
                 throw new Error('Unable to download file');
             }
 
-            const response = await api.get<Blob>(`/admin/tasks/${taskId}/files/${fileId}`, {
+            const response = await api.get<Blob>(`/tasks/${taskId}/files/${fileId}`, {
                 responseType: 'blob',
             });
 
@@ -506,6 +517,30 @@ export const taskService = {
         }
     },
 
+    previewTaskFile: async (taskId: string, fileId: string): Promise<{ blob: Blob; filename: string; contentType: string }> => {
+        try {
+            if (!taskId || !fileId) {
+                throw new Error('Unable to preview file');
+            }
+
+            const response = await api.get<Blob>(`/tasks/${taskId}/files/${fileId}`, {
+                params: { preview: 1 },
+                responseType: 'blob',
+            });
+
+            const disposition = response.headers['content-disposition'] ?? response.headers['Content-Disposition'] ?? '';
+            const filenameMatch = /filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i.exec(disposition);
+
+            return {
+                blob: response.data,
+                filename: decodeURIComponent(filenameMatch?.[1] ?? filenameMatch?.[2] ?? `file-${fileId}`),
+                contentType: response.headers['content-type'] ?? response.headers['Content-Type'] ?? response.data.type,
+            };
+        } catch (error: unknown) {
+            throw makeError(extractErrorMessage(error, 'Failed to preview file'));
+        }
+    },
+
     getTaskActivityLogs: async (taskId: string): Promise<ActivityLogFeed> => {
         try {
             const response = await api.get(TASK_ACTIVITY_LOGS_PATH(taskId));
@@ -515,5 +550,19 @@ export const taskService = {
         }
     },
 
-    // Note: assignment, status updates and file uploads are intentionally omitted for Step 2
+    updateEmployeeTaskStatus: async (taskId: string, status: TaskStatus): Promise<Task> => {
+        try {
+            const response = await api.patch<ApiEnvelope<Task>>(`/employee/tasks/${taskId}/status`, { status });
+            const task = getEnvelopeData<Task>(response.data);
+
+            if (!task) {
+                throw new Error('Invalid task status response');
+            }
+
+            notifyTaskMutation();
+            return task;
+        } catch (error: unknown) {
+            throw makeError(extractErrorMessage(error, 'Failed to update task status'));
+        }
+    },
 };

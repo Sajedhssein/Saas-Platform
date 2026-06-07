@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { Modal } from './Modal';
 import { Button, EmptyState, LoadingSpinner, StatusBadge, TaskActivityTimeline, TaskAttachmentList, TaskCommentList } from './index';
@@ -19,6 +19,8 @@ interface Props {
   onAssign?: (task: Task) => void;
   savingTaskIds?: Record<string, boolean>;
   refreshToken?: number;
+  canUploadFiles?: boolean;
+  canDeleteFiles?: boolean;
 }
 
 const statusOptionClasses: Record<Task['status'], string> = {
@@ -49,6 +51,8 @@ const TaskDetailsModal = ({
   onAssign,
   savingTaskIds,
   refreshToken,
+  canUploadFiles = true,
+  canDeleteFiles = true,
 }: Props) => {
   const [task, setTask] = useState<Task | null>(null);
   const [taskError, setTaskError] = useState<string | null>(null);
@@ -57,7 +61,9 @@ const TaskDetailsModal = ({
   const [commentText, setCommentText] = useState<string>('');
   const [isCommentSubmitting, setIsCommentSubmitting] = useState<boolean>(false);
   const [downloadingFileIds, setDownloadingFileIds] = useState<Record<string, boolean>>({});
+  const [previewingFileIds, setPreviewingFileIds] = useState<Record<string, boolean>>({});
   const [deletingFileIds, setDeletingFileIds] = useState<Record<string, boolean>>({});
+  const [commentAttachment, setCommentAttachment] = useState<File | null>(null);
   const [taskRefreshToken, setTaskRefreshToken] = useState<number>(0);
   const [commentsRefreshToken, setCommentsRefreshToken] = useState<number>(0);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
@@ -66,6 +72,7 @@ const TaskDetailsModal = ({
   const [deletingCommentIds, setDeletingCommentIds] = useState<Record<string, boolean>>({});
   const [isFileUploadOpen, setIsFileUploadOpen] = useState<boolean>(false);
   const displayedTask = taskProp && taskProp.id === taskId ? taskProp : task;
+  const commentsEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,6 +128,7 @@ const TaskDetailsModal = ({
 
   const handleClose = () => {
     setIsFileUploadOpen(false);
+    setCommentAttachment(null);
     onClose();
   };
 
@@ -136,10 +144,11 @@ const TaskDetailsModal = ({
   };
 
   const handleStatusChange = async (nextStatus: Task['status']) => {
-    if (!task || !onStatusChange) return;
+    const activeTask = task ?? displayedTask;
+    if (!activeTask || !onStatusChange) return;
 
     try {
-      const updatedTask = await onStatusChange(task.id, nextStatus);
+      const updatedTask = await onStatusChange(activeTask.id, nextStatus);
       setTask(updatedTask);
     } catch {
       // parent handles rollback/toast
@@ -147,7 +156,8 @@ const TaskDetailsModal = ({
   };
 
   const handleAddComment = async () => {
-    if (!task) return;
+    const activeTask = task ?? displayedTask;
+    if (!activeTask) return;
 
     const message = commentText.trim();
     if (!message) return;
@@ -159,8 +169,9 @@ const TaskDetailsModal = ({
       setIsCommentSubmitting(true);
       setComments((current) => [...(current ?? []), optimisticComment]);
       setCommentText('');
+      setCommentAttachment(null);
 
-      const createdComment = await taskService.createTaskComment(task.id, { content: message });
+      const createdComment = await taskService.createTaskComment(activeTask.id, { content: message, attachment: commentAttachment });
       setComments((current) => (current ?? []).map((comment) => (comment.id === optimisticComment.id ? createdComment : comment)));
       toast.success('Comment added');
     } catch (commentError) {
@@ -183,7 +194,8 @@ const TaskDetailsModal = ({
   };
 
   const handleUpdateComment = async () => {
-    if (!task || !editingCommentId) return;
+    const activeTask = task ?? displayedTask;
+    if (!activeTask || !editingCommentId) return;
 
     const message = editingCommentMessage.trim();
     if (!message) return;
@@ -199,7 +211,7 @@ const TaskDetailsModal = ({
         )
       );
 
-      const updatedComment = await taskService.updateTaskComment(task.id, editingCommentId, { content: message });
+      const updatedComment = await taskService.updateTaskComment(activeTask.id, editingCommentId, { content: message });
       setComments((current) =>
         (current ?? []).map((comment) => (comment.id === editingCommentId ? updatedComment : comment))
       );
@@ -217,7 +229,8 @@ const TaskDetailsModal = ({
   };
 
   const handleDeleteComment = async (comment: TaskComment) => {
-    if (!task) return;
+    const activeTask = task ?? displayedTask;
+    if (!activeTask) return;
 
     const previousComments = comments ?? [];
 
@@ -227,7 +240,7 @@ const TaskDetailsModal = ({
       if (editingCommentId === comment.id) {
         cancelEditComment();
       }
-      await taskService.deleteTaskComment(task.id, comment.id);
+      await taskService.deleteTaskComment(activeTask.id, comment.id);
       toast.success('Comment deleted');
     } catch (deleteError) {
       setComments(previousComments);
@@ -246,15 +259,20 @@ const TaskDetailsModal = ({
     setDeletingFileIds((current) => ({ ...current, [fileId]: value }));
   };
 
+  const setPreviewState = (fileId: string, value: boolean) => {
+    setPreviewingFileIds((current) => ({ ...current, [fileId]: value }));
+  };
+
   const handleDownloadFile = async (file: TaskFile) => {
-    if (!task || !task.id || !file?.id) {
+    const activeTask = task ?? displayedTask;
+    if (!activeTask || !activeTask.id || !file?.id) {
       toast.error('Unable to download file');
       return;
     }
 
     try {
       setFileActionState(file.id, 'downloading', true);
-      const result = await taskService.downloadTaskFile(task.id, file.id);
+      const result = await taskService.downloadTaskFile(activeTask.id, file.id);
       const objectUrl = URL.createObjectURL(result.blob);
       const anchor = document.createElement('a');
       anchor.href = objectUrl;
@@ -268,10 +286,50 @@ const TaskDetailsModal = ({
     }
   };
 
-  const handleDeleteFile = async (file: TaskFile) => {
-    if (!task) return;
+  const handlePreviewFile = async (file: TaskFile) => {
+    const activeTask = task ?? displayedTask;
+    if (!activeTask || !activeTask.id || !file?.id) {
+      toast.error('Unable to preview file');
+      return;
+    }
 
-    const previousTask = task;
+    try {
+      setPreviewState(file.id, true);
+      const result = await taskService.previewTaskFile(activeTask.id, file.id);
+      const contentType = result.contentType.toLowerCase();
+
+      if (!contentType.includes('pdf') && !contentType.startsWith('image/')) {
+        toast.error('Preview is available for PDF and image files only');
+        return;
+      }
+
+      const objectUrl = URL.createObjectURL(result.blob);
+      window.open(objectUrl, '_blank', 'noopener,noreferrer');
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch (previewError) {
+      toast.error(previewError instanceof Error ? previewError.message : 'Unable to preview file');
+    } finally {
+      setPreviewState(file.id, false);
+    }
+  };
+
+  const handleDownloadCommentAttachment = (comment: TaskComment) => {
+    if (comment.attachment) {
+      void handleDownloadFile(comment.attachment);
+    }
+  };
+
+  const handlePreviewCommentAttachment = (comment: TaskComment) => {
+    if (comment.attachment) {
+      void handlePreviewFile(comment.attachment);
+    }
+  };
+
+  const handleDeleteFile = async (file: TaskFile) => {
+    const activeTask = task ?? displayedTask;
+    if (!activeTask) return;
+
+    const previousTask = activeTask;
 
     try {
       setFileActionState(file.id, 'deleting', true);
@@ -283,7 +341,7 @@ const TaskDetailsModal = ({
             }
           : current
       );
-      await taskService.deleteTaskFile(task.id, file.id);
+      await taskService.deleteTaskFile(activeTask.id, file.id);
       toast.success('File deleted');
       setTaskRefreshToken((current) => current + 1);
     } catch (deleteError) {
@@ -300,8 +358,13 @@ const TaskDetailsModal = ({
   const commentsControlsDisabled = busy || commentsLoading || Boolean(commentsError);
   const isSaving = displayedTask ? Boolean(savingTaskIds?.[displayedTask.id]) : false;
   const statusValue = displayedTask?.status ?? 'pending';
-  const isAnyFileBusy = isFileUploadOpen || Object.values(downloadingFileIds).some(Boolean) || Object.values(deletingFileIds).some(Boolean);
+  const isAnyFileBusy = isFileUploadOpen || Object.values(downloadingFileIds).some(Boolean) || Object.values(previewingFileIds).some(Boolean) || Object.values(deletingFileIds).some(Boolean);
   const isAnyCommentBusy = isCommentSubmitting || isEditingComment || Object.values(deletingCommentIds).some(Boolean);
+
+  useEffect(() => {
+    if (!open || comments === null) return;
+    commentsEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [open, comments]);
 
   return (
     <Modal
@@ -419,17 +482,21 @@ const TaskDetailsModal = ({
           <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <h4 className="text-lg font-semibold text-slate-900">Attachments ({displayedTask.files?.length ?? 0})</h4>
-              <Button variant="primary" size="sm" onClick={() => setIsFileUploadOpen(true)} disabled={!canEdit || isAnyCommentBusy}>
-                Upload File
-              </Button>
+              {canUploadFiles && (
+                <Button variant="primary" size="sm" onClick={() => setIsFileUploadOpen(true)} disabled={!canEdit || isAnyCommentBusy}>
+                  Upload File
+                </Button>
+              )}
             </div>
 
             <TaskAttachmentList
               files={displayedTask.files ?? []}
               emptyMessage="No files uploaded yet. Use Upload File to add one."
               onDownload={handleDownloadFile}
-              onDelete={handleDeleteFile}
+              onPreview={handlePreviewFile}
+              onDelete={canDeleteFiles ? handleDeleteFile : undefined}
               downloadingFileId={Object.keys(downloadingFileIds).find((id) => downloadingFileIds[id]) ?? null}
+              previewingFileId={Object.keys(previewingFileIds).find((id) => previewingFileIds[id]) ?? null}
               deletingFileId={Object.keys(deletingFileIds).find((id) => deletingFileIds[id]) ?? null}
             />
           </section>
@@ -461,10 +528,13 @@ const TaskDetailsModal = ({
                 emptyMessage="No comments yet."
                 onEdit={startEditComment}
                 onDelete={handleDeleteComment}
+                onDownloadAttachment={handleDownloadCommentAttachment}
+                onPreviewAttachment={handlePreviewCommentAttachment}
                 editingCommentId={editingCommentId}
                 deletingCommentId={Object.keys(deletingCommentIds).find((id) => deletingCommentIds[id]) ?? null}
               />
             )}
+            <div ref={commentsEndRef} />
 
             {editingCommentId && (
               <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
@@ -505,6 +575,23 @@ const TaskDetailsModal = ({
                 disabled={commentsControlsDisabled || isCommentSubmitting || isEditingComment || !canEdit}
                 placeholder="Write a comment..."
               />
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <input
+                  type="file"
+                  onChange={(event) => setCommentAttachment(event.target.files?.[0] ?? null)}
+                  disabled={commentsControlsDisabled || isCommentSubmitting || isEditingComment || !canEdit}
+                  className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-200 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-300 sm:w-auto"
+                />
+                {commentAttachment && (
+                  <button
+                    type="button"
+                    onClick={() => setCommentAttachment(null)}
+                    className="self-start rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:bg-white sm:self-auto"
+                  >
+                    Remove attachment
+                  </button>
+                )}
+              </div>
               <div className="flex items-center justify-end gap-2">
                 <Button
                   variant="secondary"

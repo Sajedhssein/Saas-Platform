@@ -5,8 +5,10 @@ interface TaskAttachmentListProps {
   files?: TaskFile[] | null;
   emptyMessage?: string;
   onDownload?: (file: TaskFile) => void;
+  onPreview?: (file: TaskFile) => void;
   onDelete?: (file: TaskFile) => void;
   downloadingFileId?: string | null;
+  previewingFileId?: string | null;
   deletingFileId?: string | null;
 }
 
@@ -97,8 +99,10 @@ export const TaskAttachmentList = ({
   files,
   emptyMessage = 'No files uploaded yet.',
   onDownload,
+  onPreview,
   onDelete,
   downloadingFileId,
+  previewingFileId,
   deletingFileId,
 }: TaskAttachmentListProps) => {
   const safeFiles = Array.isArray(files) ? files : [];
@@ -168,7 +172,7 @@ export const TaskAttachmentList = ({
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="truncate font-medium text-slate-900">{normalized.name}</p>
-                        {normalized.url && (
+                        {normalized.url && !onPreview && (
                           <a
                             href={normalized.url}
                             target="_blank"
@@ -196,6 +200,17 @@ export const TaskAttachmentList = ({
                       >
                         <Download size={14} />
                         {downloadingFileId === normalized.id ? 'Downloading...' : 'Download'}
+                      </button>
+                    )}
+                    {onPreview && (
+                      <button
+                        type="button"
+                        onClick={() => onPreview(normalized.callbackFile)}
+                        disabled={previewingFileId === normalized.id || downloadingFileId === normalized.id || deletingFileId === normalized.id}
+                        className="inline-flex items-center gap-2 rounded-md border border-blue-300 px-3 py-1.5 text-sm text-blue-700 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <ExternalLink size={14} />
+                        {previewingFileId === normalized.id ? 'Opening...' : 'Preview'}
                       </button>
                     )}
                     {onDelete && (

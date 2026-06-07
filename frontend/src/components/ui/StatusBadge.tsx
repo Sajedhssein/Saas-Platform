@@ -32,7 +32,7 @@ export const StatusBadge = ({ status, label }: StatusBadgeProps) => {
 
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium ${statusStyles[status]}`}
+      className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium leading-5 sm:text-sm ${statusStyles[status]}`}
     >
       {label || statusLabels[status]}
     </span>

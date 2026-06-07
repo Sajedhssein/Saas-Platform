@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { generatePath, useParams, useNavigate } from 'react-router-dom';
-import { PageContainer, LoadingSpinner, DataFetchError, EmptyState } from '../../components/ui';
+import { Avatar, PageContainer, LoadingSpinner, DataFetchError, EmptyState } from '../../components/ui';
 import { clientService } from '../../services/clientService';
 import type { ClientRecord } from '../../services/clientService';
 import type { Project } from '../../types/project';
@@ -66,7 +66,7 @@ export const ClientDetails = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         <div className="bg-white rounded-lg border p-6">
           <div className="flex items-center gap-4">
-            <img src={client.avatar} alt={client.name} className="w-16 h-16 rounded-full" />
+            <Avatar imageUrl={client.avatar} name={client.name} size="lg" />
             <div>
               <h2 className="text-lg font-semibold text-slate-900">{client.name}</h2>
               <p className="text-sm text-slate-500">{client.company}</p>

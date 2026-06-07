@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { CheckSquare, Clock, FolderOpen } from 'lucide-react';
 import { DashboardCard, DataFetchError, EmptyState, LoadingSpinner, PageContainer, ProgressBar, StatusBadge } from '../../components/ui';
+import TaskDetailsModal from '../../components/ui/TaskDetailsModal';
 import { employeeService } from '../../services/employeeService';
+import { taskService } from '../../services/taskService';
 import type { Task } from '../../types/task';
 
 export const EmployeeTasks = () => {
@@ -9,6 +11,8 @@ export const EmployeeTasks = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [detailsTaskId, setDetailsTaskId] = useState<string | null>(null);
+  const [savingTaskIds, setSavingTaskIds] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -68,6 +72,20 @@ export const EmployeeTasks = () => {
 
   const completedTasks = tasks.filter((task) => task.status === 'completed');
   const inProgressTasks = tasks.filter((task) => task.status === 'in_progress');
+  const selectedTask = detailsTaskId ? tasks.find((task) => task.id === detailsTaskId) ?? null : null;
+
+  const handleStatusChange = async (taskId: string, status: Task['status']): Promise<Task> => {
+    setSavingTaskIds((current) => ({ ...current, [taskId]: true }));
+
+    try {
+      const updatedTask = await taskService.updateEmployeeTaskStatus(taskId, status);
+      setTasks((current) => current.map((task) => (task.id === taskId ? { ...task, ...updatedTask } : task)));
+      setRefreshKey((value) => value + 1);
+      return updatedTask;
+    } finally {
+      setSavingTaskIds((current) => ({ ...current, [taskId]: false }));
+    }
+  };
 
   return (
     <PageContainer
@@ -82,7 +100,12 @@ export const EmployeeTasks = () => {
 
       <div className="grid gap-4 xl:grid-cols-2">
         {tasks.map((task) => (
-          <div key={task.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <button
+            key={task.id}
+            type="button"
+            onClick={() => setDetailsTaskId(task.id)}
+            className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+          >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">{task.title}</h3>
@@ -102,9 +125,21 @@ export const EmployeeTasks = () => {
             <div className="mt-4 border-t border-slate-200 pt-4 text-xs text-slate-500">
               {task.deadline ? `Due ${new Date(task.deadline).toLocaleDateString()}` : 'No due date set'}
             </div>
-          </div>
+          </button>
         ))}
       </div>
+
+      <TaskDetailsModal
+        open={Boolean(detailsTaskId)}
+        taskId={detailsTaskId}
+        task={selectedTask}
+        onClose={() => setDetailsTaskId(null)}
+        onStatusChange={handleStatusChange}
+        savingTaskIds={savingTaskIds}
+        refreshToken={refreshKey}
+        canUploadFiles={false}
+        canDeleteFiles={false}
+      />
     </PageContainer>
   );
 };

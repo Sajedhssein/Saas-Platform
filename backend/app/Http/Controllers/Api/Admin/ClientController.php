@@ -10,6 +10,7 @@ use App\Models\Client;
 use App\Models\Project;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\ActivityLogService;
 use App\Services\UserCreationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -57,6 +58,8 @@ class ClientController extends Controller
             ->withCount('projects')
             ->findOrFail($user->id);
 
+        ActivityLogService::logClientCreated(auth()->user(), $client);
+
         return response()->json([
             'success' => true,
             'message' => 'Client created successfully.',
@@ -75,8 +78,31 @@ class ClientController extends Controller
             ], 404);
         }
 
-        $client->fill($request->validated());
+        $previousStatus = $client->status;
+        $data = $request->validated();
+        if (isset($data['contactName']) && ! isset($data['name'])) {
+            $data['name'] = $data['contactName'];
+        }
+
+        if (isset($data['status'])) {
+            $data['is_active'] = $data['status'] === 'active';
+        } elseif (array_key_exists('is_active', $data)) {
+            $data['status'] = $data['is_active'] ? 'active' : 'inactive';
+        }
+
+        $data['avatar_url'] = $data['avatar_url'] ?? $data['avatar'] ?? $client->avatar_url;
+        unset($data['avatar'], $data['company'], $data['company_name'], $data['projects'], $data['contactName']);
+
+        $client->fill($data);
         $client->save();
+
+        if ($previousStatus !== $client->status) {
+            if ($client->status === 'active') {
+                ActivityLogService::logUserActivated(auth()->user(), $client);
+            } elseif ($client->status === 'inactive') {
+                ActivityLogService::logUserDeactivated(auth()->user(), $client);
+            }
+        }
 
         $client = Client::query()
             ->with(['company:id,name', 'roles:id,name'])
@@ -125,6 +151,8 @@ class ClientController extends Controller
                 'name' => $client->name,
                 'email' => $client->email,
                 'phone' => $client->phone,
+                'avatar' => $client->avatar_url,
+                'avatar_url' => $client->avatar_url,
                 'department' => $client->department,
                 'position' => $client->position,
                 'status' => $client->status,
@@ -138,6 +166,25 @@ class ClientController extends Controller
                     'status' => $project->status,
                 ])->values(),
             ],
+        ]);
+    }
+
+    public function destroy(Client $client): JsonResponse
+    {
+        $this->authorize('manageClients');
+
+        if ($client->company_id !== auth()->user()->company_id || ! $client->hasRole(Role::CLIENT)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Client not found.',
+            ], 404);
+        }
+
+        $client->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Client deleted successfully.',
         ]);
     }
 }

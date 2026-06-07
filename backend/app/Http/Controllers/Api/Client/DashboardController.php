@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Api\Client;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ActivityLogResource;
+use App\Models\ActivityLog;
 use App\Models\Project;
 use App\Models\Report;
+use App\Models\Task;
 use Illuminate\Http\JsonResponse;
 
 class DashboardController extends Controller
@@ -38,6 +41,7 @@ class DashboardController extends Controller
             ->get();
 
         $reportsCount = $reportsQuery->count();
+        $reportIds = (clone $reportsQuery)->pluck('id');
 
         // Get recent projects (last 5, ordered by creation date)
         $recentProjects = $projects
@@ -64,6 +68,36 @@ class DashboardController extends Controller
             ])
             ->values();
 
+        $projectIds = $projects->pluck('id');
+        $taskIds = Task::query()
+            ->whereIn('project_id', $projectIds)
+            ->pluck('id');
+
+        $recentUpdates = ActivityLog::query()
+            ->forCompany($user->company_id)
+            ->with('user:id,name,email,avatar_url')
+            ->where(function ($query) use ($projectIds, $taskIds, $reportIds, $user) {
+                $query->where('user_id', $user->id)
+                    ->orWhereIn('project_id', $projectIds)
+                    ->orWhereIn('task_id', $taskIds)
+                    ->orWhere(function ($reportQuery) use ($reportIds) {
+                        $reportQuery->where('entity_type', 'Report')
+                            ->whereIn('entity_id', $reportIds);
+                    });
+            })
+            ->whereIn('action', [
+                'project_updated',
+                'project_completed',
+                'report_generated',
+                'report_viewed',
+                'FILE_UPLOADED',
+                'file_uploaded',
+                'file_deleted',
+            ])
+            ->latestFirst()
+            ->limit(8)
+            ->get();
+
         return response()->json([
             'projects_count' => $projectsCount,
             'active_projects' => $activeProjects,
@@ -71,6 +105,7 @@ class DashboardController extends Controller
             'reports_count' => $reportsCount,
             'recent_projects' => $recentProjects,
             'recent_reports' => $recentReports,
+            'recent_updates' => ActivityLogResource::collection($recentUpdates),
         ], 200);
     }
 }

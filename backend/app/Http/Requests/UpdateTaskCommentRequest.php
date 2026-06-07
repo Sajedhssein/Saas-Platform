@@ -8,7 +8,7 @@ class UpdateTaskCommentRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return auth()->check() && auth()->id() === $this->comment->user_id;
+        return auth()->check();
     }
 
     public function rules(): array

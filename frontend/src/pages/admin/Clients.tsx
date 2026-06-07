@@ -12,6 +12,7 @@ import {
   PageContainer,
   SearchBar,
   StatusBadge,
+  Avatar,
 } from '../../components/ui';
 import type { Client } from '../../types';
 import {
@@ -31,9 +32,6 @@ interface ClientFormState {
   status: Client['status'];
 }
 
-const defaultAvatar = (name: string): string =>
-  `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name || 'Client')}`;
-
 const emptyFormState: ClientFormState = {
   name: '',
   email: '',
@@ -49,7 +47,7 @@ const normalizeClient = (client: ClientRecord): Client => ({
   name: client.name || 'Unnamed Client',
   email: client.email || '',
   company: client.company || 'Independent',
-  avatar: client.avatar || defaultAvatar(client.name || 'Client'),
+  avatar: client.avatar || '',
   projects: Number(client.projects ?? 0),
   status: client.status || 'active',
 });
@@ -161,7 +159,7 @@ export const AdminClients = () => {
       email: formData.email.trim(),
       phone: formData.phone.trim(),
       company: formData.company.trim(),
-      avatar: formData.avatar.trim() || defaultAvatar(formData.name.trim()),
+      avatar: formData.avatar.trim(),
       projects: Number(formData.projects) || 0,
       status: formData.status,
     };
@@ -278,7 +276,7 @@ export const AdminClients = () => {
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3 min-w-0">
-                      <img src={client.avatar} alt={client.name} className="w-12 h-12 rounded-full shrink-0" />
+                      <Avatar imageUrl={client.avatar} name={client.name} size="md" className="h-12 w-12" />
                       <button
                         type="button"
                         onClick={() => navigate(generatePath('/admin/clients/:id', { id: client.id }))}
@@ -334,7 +332,7 @@ export const AdminClients = () => {
                         <tr key={client.id} className="hover:bg-slate-50 transition-colors">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
-                              <img src={client.avatar} alt={client.name} className="w-10 h-10 rounded-full" />
+                              <Avatar imageUrl={client.avatar} name={client.name} size="md" />
                               <button
                                 type="button"
                                 className="text-sm font-medium text-slate-900 hover:text-cyan-700"
@@ -414,7 +412,7 @@ export const AdminClients = () => {
             value={formData.avatar}
             onChange={(event) => handleChange('avatar', event.target.value)}
             placeholder="https://..."
-            helpText="Optional. Leave empty to auto-generate an avatar."
+            helpText="Optional. Leave empty to use the initial fallback."
             disabled={isSubmitting}
           />
 

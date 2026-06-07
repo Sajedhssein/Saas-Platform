@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Clock3, FileText, LayoutDashboard } from 'lucide-react';
-import api from '../../api/axios';
 import { Button, DataFetchError, EmptyState, LoadingSpinner, PageContainer, ProgressBar, StatusBadge } from '../../components/ui';
 import { clientReportService } from '../../services';
 import type { ReportRecord } from '../../types/report';

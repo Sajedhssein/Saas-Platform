@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\ActivityLogService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -394,6 +395,85 @@ class ActivityLogTest extends TestCase
             ->assertJsonPath('pagination.has_more', true);
 
         $this->assertCount(20, $response->json('data'));
+    }
+
+    public function test_admin_can_filter_activity_logs_by_weekly_period(): void
+    {
+        ActivityLogService::log(
+            $this->admin->id,
+            'CURRENT_WEEK_ACTION',
+            'Current week activity',
+            'Task',
+            $this->task->id
+        );
+
+        $olderLog = ActivityLogService::log(
+            $this->admin->id,
+            'OLDER_ACTION',
+            'Older activity',
+            'Task',
+            $this->task->id
+        );
+        $olderLog->forceFill(['created_at' => Carbon::now()->subMonths(2)])->save();
+
+        $response = $this->actingAs($this->admin, 'api')
+            ->getJson('/api/activity-logs?period=weekly');
+
+        $response->assertStatus(200)
+            ->assertJsonPath('pagination.total', 1)
+            ->assertJsonPath('data.0.action', 'CURRENT_WEEK_ACTION');
+    }
+
+    public function test_admin_can_search_activity_logs_by_project_task_and_user_names(): void
+    {
+        ActivityLogService::log(
+            $this->admin->id,
+            'SEARCHABLE_ACTION',
+            'Searchable activity',
+            'Task',
+            $this->task->id
+        );
+
+        $response = $this->actingAs($this->admin, 'api')
+            ->getJson('/api/activity-logs?search=' . urlencode($this->project->name));
+
+        $response->assertStatus(200)
+            ->assertJsonPath('pagination.total', 1)
+            ->assertJsonPath('data.0.action', 'SEARCHABLE_ACTION');
+
+        $response = $this->actingAs($this->admin, 'api')
+            ->getJson('/api/activity-logs?search=' . urlencode($this->task->title));
+
+        $response->assertStatus(200)
+            ->assertJsonPath('pagination.total', 1);
+
+        $response = $this->actingAs($this->admin, 'api')
+            ->getJson('/api/activity-logs?search=' . urlencode($this->admin->name));
+
+        $response->assertStatus(200)
+            ->assertJsonPath('pagination.total', 1);
+    }
+
+    public function test_only_admin_can_clear_company_activity_logs(): void
+    {
+        ActivityLogService::log(
+            $this->admin->id,
+            'CLEARABLE_ACTION',
+            'Clearable activity',
+            'Task',
+            $this->task->id
+        );
+
+        $this->actingAs($this->employee, 'api')
+            ->deleteJson('/api/activity-logs')
+            ->assertStatus(403);
+
+        $this->actingAs($this->admin, 'api')
+            ->deleteJson('/api/activity-logs')
+            ->assertStatus(200)
+            ->assertJsonPath('deleted_count', 1);
+
+        $this->assertDatabaseCount('activity_logs', 0);
     }
 
     /**

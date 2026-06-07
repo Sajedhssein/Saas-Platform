@@ -11,13 +11,17 @@ import {
   ShieldAlert,
   Sparkles,
   TrendingUp,
+  UploadCloud,
   Zap,
 } from 'lucide-react';
 import { LineTrend } from '../../components/ui/AnalyticsUI';
-import { DataFetchError, EmptyState, PageContainer, ProgressBar, StatusBadge } from '../../components/ui';
+import { useNavigate } from 'react-router-dom';
+import { ActivityTimeline, DataFetchError, EmptyState, PageContainer, ProgressBar, QuickActions, TaskStatusBadge, WeeklyStatsCard } from '../../components/ui';
 import useAuthStore from '../../store/authStore';
 import { dashboardService } from '../../services/dashboardService';
+import { taskService } from '../../services/taskService';
 import type { EmployeeDashboard as EmployeeDashboardData, EmployeeDashboardTask } from '../../types/dashboard';
+import type { TaskStatus } from '../../types/task';
 
 const cardMotion = {
   initial: { opacity: 0, y: 14 },
@@ -144,9 +148,13 @@ const MetricCard = ({ title, value, subtitle, icon, tone = 'slate' }: { title: s
   );
 };
 
-const TaskProgressCard = ({ task }: { task: EmployeeDashboardTask }) => {
+const toApiStatus = (status: EmployeeDashboardTask['status']): TaskStatus => (
+  status === 'in-progress' ? 'in_progress' : status === 'overdue' ? 'pending' : status
+);
+
+const TaskProgressCard = ({ task, onStatusChange, updating }: { task: EmployeeDashboardTask; onStatusChange: (taskId: string, status: TaskStatus) => Promise<void>; updating?: boolean; }) => {
   const priorityTone = getPriorityTone(task.priority);
-  const status = task.status === 'overdue' ? 'high' : task.status === 'in-progress' ? 'in-progress' : task.status;
+  const status = task.status === 'in-progress' ? 'in_progress' : task.status === 'overdue' ? 'overdue' : task.status;
 
   return (
     <motion.div
@@ -164,7 +172,7 @@ const TaskProgressCard = ({ task }: { task: EmployeeDashboardTask }) => {
           </div>
           <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{task.description || 'No description provided.'}</p>
         </div>
-        <StatusBadge status={status} label={task.status === 'overdue' ? 'Overdue' : undefined} />
+        <TaskStatusBadge status={status} />
       </div>
 
       <div className="mt-4 rounded-2xl bg-slate-50 p-4">
@@ -179,6 +187,16 @@ const TaskProgressCard = ({ task }: { task: EmployeeDashboardTask }) => {
           <span>{task.progress}% complete</span>
           <span>{task.status.replace('-', ' ')}</span>
         </div>
+        <select
+          value={toApiStatus(task.status)}
+          onChange={(event) => void onStatusChange(task.id, event.target.value as TaskStatus)}
+          disabled={updating}
+          className="mt-3 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium leading-6 text-slate-700 outline-none transition-colors focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="pending">Todo</option>
+          <option value="in_progress">In Progress</option>
+          <option value="completed">Completed</option>
+        </select>
       </div>
     </motion.div>
   );
@@ -229,11 +247,13 @@ const ProjectProgressCard = ({ name, progress, taskCount }: { name: string; prog
 };
 
 export const EmployeeDashboard = () => {
+  const navigate = useNavigate();
   const authUser = useAuthStore((state) => state.user);
   const [dashboard, setDashboard] = useState<EmployeeDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -303,6 +323,18 @@ export const EmployeeDashboard = () => {
     setRefreshKey((value) => value + 1);
   };
 
+  const handleTaskStatusChange = async (taskId: string, status: TaskStatus) => {
+    try {
+      setUpdatingTaskId(taskId);
+      await taskService.updateEmployeeTaskStatus(taskId, status);
+      setRefreshKey((value) => value + 1);
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : 'Failed to update task status');
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  };
+
   if (loading) {
     return (
       <PageContainer title="Dashboard" description="Welcome back! Here's your work overview." titleClassName="text-black">
@@ -324,6 +356,14 @@ export const EmployeeDashboard = () => {
   return (
     <PageContainer title="Dashboard" description="Welcome! Here's your work overview." titleClassName="text-black">
       <div className="space-y-8">
+        <QuickActions
+          actions={[
+            { label: 'My Tasks', description: 'Review and update your assigned tasks.', icon: <ListTodo size={18} />, onClick: () => navigate('/employee/tasks') },
+            { label: 'My Projects', description: 'Open projects connected to your work.', icon: <FolderKanban size={18} />, onClick: () => navigate('/employee/projects') },
+            { label: 'Upload File', description: 'Attach files from a task detail view.', icon: <UploadCloud size={18} />, onClick: () => navigate('/employee/tasks') },
+            { label: 'Notifications', description: 'Check task and team updates.', icon: <Bell size={18} />, onClick: () => navigate('/employee/notifications') },
+          ]}
+        />
         <motion.section
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
@@ -400,6 +440,12 @@ export const EmployeeDashboard = () => {
           <MetricCard title="Overdue" value={summary.overdueTasks} subtitle="Needs attention" icon={<AlertCircle size={22} />} tone="rose" />
         </section>
 
+        <WeeklyStatsCard
+          completedThisWeek={dashboard?.completedThisWeek ?? 0}
+          projectsThisWeek={dashboard?.projectsThisWeek ?? 0}
+          activeTasks={dashboard?.activeTasks ?? summary.pendingTasks}
+        />
+
         <section className="grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">
           <motion.div {...cardMotion} className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.06)]">
             <div className="flex items-start justify-between gap-4">
@@ -427,7 +473,14 @@ export const EmployeeDashboard = () => {
                 <h2 className="text-lg font-semibold text-slate-900">Notifications</h2>
                 <p className="mt-1 text-sm text-slate-600">Recent updates and reminders.</p>
               </div>
-              <Bell size={18} className="text-slate-500" />
+              <div className="relative">
+                <Bell size={18} className="text-slate-500" />
+                {(dashboard?.unreadNotificationsCount ?? 0) > 0 && (
+                  <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                    {dashboard?.unreadNotificationsCount}
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="mt-5 space-y-3">
@@ -488,11 +541,25 @@ export const EmployeeDashboard = () => {
               {recentTasks.length === 0 ? (
                 <EmptyState title="No assigned tasks" message="When tasks are assigned to you, they will appear here." />
               ) : (
-                recentTasks.map((task) => <TaskProgressCard key={task.id} task={task} />)
+                recentTasks.map((task) => (
+                  <TaskProgressCard
+                    key={task.id}
+                    task={task}
+                    onStatusChange={handleTaskStatusChange}
+                    updating={updatingTaskId === task.id}
+                  />
+                ))
               )}
             </div>
           </motion.div>
         </section>
+
+        <ActivityTimeline
+          title="My Recent Activity"
+          subtitle="Recent task, comment, file, and project updates connected to your assigned work."
+          activities={dashboard?.recentActivity ?? dashboard?.recent_activity ?? []}
+          emptyMessage="Your assigned task and project activity will appear here."
+        />
       </div>
     </PageContainer>
   );

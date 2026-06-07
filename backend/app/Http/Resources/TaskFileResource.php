@@ -21,14 +21,18 @@ class TaskFileResource extends JsonResource
             'id' => $this->id,
             'task_id' => $this->task_id,
             'uploaded_by' => $this->uploaded_by,
+            'comment_id' => $this->comment_id,
             'name' => $this->file_name,
             'filename' => $this->file_name,
             'original_name' => $this->file_name,
             'file_name' => $this->file_name,
             'file_path' => $filePath,
             'download_url' => $downloadUrl,
+            'mime_type' => $this->file_type,
+            'size' => $this->file_size,
             'file_type' => $this->file_type,
             'file_size' => $this->file_size,
+            'created_at' => $this->created_at?->toDateTimeString(),
             'uploaded_at' => $this->created_at?->toDateTimeString(),
         ];
     }

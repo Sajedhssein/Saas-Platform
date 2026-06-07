@@ -5,12 +5,16 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ActivityLogResource;
 use App\Models\ActivityLog;
+use App\Models\Report;
 use App\Models\Task;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ActivityLogController extends Controller
 {
+    private const ADMIN_PERIODS = ['today', 'weekly', 'monthly', 'all'];
+
     /**
      * Get all activity logs
      * Admin can view all logs
@@ -19,14 +23,13 @@ class ActivityLogController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = auth()->user();
-        $perPage = 20;
+        $perPage = min(max((int) $request->query('per_page', 20), 1), 50);
 
         $query = ActivityLog::query()
             ->forCompany($user->company_id)
-            ->with('user');
+            ->with(['user', 'project', 'task']);
 
-        // Non-admin users can only see logs for tasks they're involved in or their own actions
-        if (!$user->hasRole('admin')) {
+        if ($user->hasRole('employee')) {
             $assignedTaskIds = $user->tasks()
                 ->pluck('tasks.id')
                 ->toArray();
@@ -41,10 +44,50 @@ class ActivityLogController extends Controller
                             });
                     });
             });
+        } elseif ($user->hasRole('client')) {
+            $projectIds = $user->ownedProjects()
+                ->pluck('projects.id')
+                ->merge($user->projects()->pluck('projects.id'))
+                ->unique()
+                ->values();
+
+            $taskIds = Task::query()
+                ->whereIn('project_id', $projectIds)
+                ->pluck('id');
+
+            $reportIds = Report::query()
+                ->where('company_id', $user->company_id)
+                ->where('recipient_email', $user->email)
+                ->pluck('id');
+
+            $query->where(function ($query) use ($projectIds, $taskIds, $reportIds, $user) {
+                $query->where('user_id', $user->id)
+                    ->orWhereIn('project_id', $projectIds)
+                    ->orWhereIn('task_id', $taskIds)
+                    ->orWhere(function ($reportQuery) use ($reportIds) {
+                        $reportQuery->where('entity_type', 'Report')
+                            ->whereIn('entity_id', $reportIds);
+                    });
+            })->whereIn('action', [
+                'project_updated',
+                'project_completed',
+                'report_generated',
+                'report_viewed',
+                'FILE_UPLOADED',
+                'file_uploaded',
+                'file_deleted',
+            ]);
+        } elseif (! $user->hasRole('admin')) {
+            $query->where('user_id', $user->id);
         }
 
-        // Apply optional date filters on logs
-        $query->applyRequestRange($request, 'created_at');
+        if ($user->hasRole('admin')) {
+            $this->applyAdminPeriodFilter($query, (string) $request->query('period', 'all'));
+        } else {
+            $query->applyRequestRange($request, 'created_at');
+        }
+
+        $this->applySearch($query, trim((string) $request->query('search', '')), $user->company_id);
 
         $logs = $query->latestFirst()
             ->paginate($perPage);
@@ -60,6 +103,26 @@ class ActivityLogController extends Controller
                 'to' => $logs->lastItem(),
                 'has_more' => $logs->hasMorePages(),
             ],
+        ]);
+    }
+
+    public function clear(Request $request): JsonResponse
+    {
+        $user = auth()->user();
+
+        if (! $user->hasRole('admin')) {
+            return response()->json([
+                'message' => 'Only admins can clear activity logs.',
+            ], 403);
+        }
+
+        $deletedCount = ActivityLog::query()
+            ->forCompany($user->company_id)
+            ->delete();
+
+        return response()->json([
+            'message' => 'Activity logs cleared.',
+            'deleted_count' => $deletedCount,
         ]);
     }
 
@@ -109,5 +172,53 @@ class ActivityLogController extends Controller
                 'has_more' => $logs->hasMorePages(),
             ],
         ]);
+    }
+
+    private function applyAdminPeriodFilter($query, string $period): void
+    {
+        if (! in_array($period, self::ADMIN_PERIODS, true) || $period === 'all') {
+            return;
+        }
+
+        $now = Carbon::now();
+
+        match ($period) {
+            'today' => $query->whereBetween('created_at', [$now->copy()->startOfDay(), $now->copy()->endOfDay()]),
+            'weekly' => $query->whereBetween('created_at', [$now->copy()->startOfWeek(), $now->copy()->endOfWeek()]),
+            'monthly' => $query->whereBetween('created_at', [$now->copy()->startOfMonth(), $now->copy()->endOfMonth()]),
+        };
+    }
+
+    private function applySearch($query, string $search, string $companyId): void
+    {
+        if ($search === '') {
+            return;
+        }
+
+        $reportIds = Report::query()
+            ->forCompany($companyId)
+            ->where('title', 'like', "%{$search}%")
+            ->pluck('id');
+
+        $query->where(function ($searchQuery) use ($search, $reportIds) {
+            $searchQuery
+                ->where('description', 'like', "%{$search}%")
+                ->orWhereHas('user', function ($userQuery) use ($search) {
+                    $userQuery->where('name', 'like', "%{$search}%");
+                })
+                ->orWhereHas('project', function ($projectQuery) use ($search) {
+                    $projectQuery->where('name', 'like', "%{$search}%");
+                })
+                ->orWhereHas('task', function ($taskQuery) use ($search) {
+                    $taskQuery->where('title', 'like', "%{$search}%");
+                })
+                ->orWhere(function ($reportQuery) use ($reportIds, $search) {
+                    $reportQuery->where('entity_type', 'Report')
+                        ->where(function ($entityQuery) use ($reportIds, $search) {
+                            $entityQuery->whereIn('entity_id', $reportIds)
+                                ->orWhere('description', 'like', "%{$search}%");
+                        });
+                });
+        });
     }
 }

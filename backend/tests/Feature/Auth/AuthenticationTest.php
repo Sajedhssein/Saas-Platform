@@ -73,6 +73,37 @@ class AuthenticationTest extends TestCase
             ]);
     }
 
+    public function test_refresh_token_can_issue_new_tokens_without_access_token()
+    {
+        User::factory()->create([
+            'email' => 'refresh@test.com',
+            'password' => bcrypt('Password123'),
+        ]);
+
+        $loginResponse = $this->postJson('/api/auth/login', [
+            'email' => 'refresh@test.com',
+            'password' => 'Password123',
+        ]);
+
+        $refreshToken = $loginResponse->json('data.refresh_token');
+
+        $this->assertNotEmpty($refreshToken);
+
+        $response = $this->postJson('/api/auth/refresh', [
+            'refresh_token' => $refreshToken,
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['success' => true])
+            ->assertJsonStructure([
+                'data' => [
+                    'token',
+                    'refresh_token',
+                    'user',
+                ],
+            ]);
+    }
+
     public function test_login_with_invalid_credentials()
     {
         $response = $this->postJson('/api/auth/login', [

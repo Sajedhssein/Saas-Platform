@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { FolderOpen } from 'lucide-react';
-import { DashboardCard, PageContainer } from '../../components/ui';
+import { PageContainer } from '../../components/ui';
 import TaskAttachmentList from '../../components/ui/TaskAttachmentList';
 import type { TaskFile } from '../../types/task';
 import { clientFileService } from '../../services';
@@ -28,13 +28,6 @@ export const ClientFiles = () => {
   useEffect(() => {
     void Promise.resolve().then(loadFiles);
   }, [loadFiles]);
-
-  const stats = useMemo(
-    () => [
-      { title: 'Files', value: files?.length ?? 0, icon: <FolderOpen size={22} /> },
-    ],
-    [files]
-  );
 
   const handleDownload = async (file: TaskFile) => {
     const id = file.id ?? String(file.path ?? file.url ?? file.name);

@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { Bell, Users, FolderOpen, CheckSquare, TrendingUp } from 'lucide-react';
-import { PageContainer } from '../../components/ui';
+import { Bell, Users, FolderOpen, CheckSquare, TrendingUp, MailPlus, FileBarChart, UserPlus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ActivityLogPanel, PageContainer, QuickActions } from '../../components/ui';
 import { DashboardSkeleton } from '../../components/ui/SkeletonLoader';
 import { DataFetchError, EmptyState } from '../../components/ui/DataFetchError';
 import { dashboardService } from '../../services/dashboardService';
@@ -10,6 +11,7 @@ import { KpiCard, LineTrend, DonutStatus, WorkloadBar, Leaderboard, ProjectProgr
 import useNotificationStore from '../../store/notificationStore';
 
 export const AdminDashboard = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [workload, setWorkload] = useState<WorkloadEmployee[]>([]);
   const [performance, setPerformance] = useState<PerformanceData | null>(null);
@@ -134,6 +136,14 @@ export const AdminDashboard = () => {
       title="Dashboard"
       description="Welcome back! Here's your business overview."
     >
+      <QuickActions
+        actions={[
+          { label: 'Create Project', description: 'Start a new client or internal project.', icon: <FolderOpen size={18} />, onClick: () => navigate('/admin/projects') },
+          { label: 'Invite Employee', description: 'Send an invite to a new teammate.', icon: <MailPlus size={18} />, onClick: () => navigate('/admin/invites') },
+          { label: 'Add Client', description: 'Create a client profile for your workspace.', icon: <UserPlus size={18} />, onClick: () => navigate('/admin/clients') },
+          { label: 'Generate Report', description: 'Create and share an enterprise report.', icon: <FileBarChart size={18} />, onClick: () => navigate('/admin/reports') },
+        ]}
+      />
       <div className="mb-8 overflow-hidden rounded-[1.75rem] border border-slate-200 bg-linear-to-br from-cyan-50 via-white to-slate-100 px-5 py-4 shadow-[0_24px_80px_rgba(15,23,42,0.1)]">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
@@ -245,6 +255,10 @@ export const AdminDashboard = () => {
       <div className="rounded-[1.75rem] border border-slate-200 bg-linear-to-br from-white to-cyan-50/50 p-6 shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
         <h3 className="mb-4 text-lg font-semibold text-slate-900">Project Progress Overview</h3>
         <ProjectProgressList projects={stats.projectProgress ?? stats.project_progress ?? []} />
+      </div>
+
+      <div className="mt-8">
+        <ActivityLogPanel initialActivities={stats.recentActivity ?? stats.recent_activity ?? []} />
       </div>
     </PageContainer>
   );

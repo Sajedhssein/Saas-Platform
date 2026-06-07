@@ -35,7 +35,10 @@ export const Login = () => {
       const response = await authService.login({ email, password });
       
       // Store token and user in Zustand store
-      login(response.user, response.token);
+      login(response.user, response.token, {
+        rememberMe,
+        refreshToken: response.refreshToken,
+      });
 
       const resolvedRole = resolveUserRole(response.user);
       const dashboardPath = getDashboardPathForUser(response.user);
@@ -189,6 +192,8 @@ export const Login = () => {
                   <input
                     type="checkbox"
                     className="w-4 h-4 rounded border-slate-500 bg-slate-900 text-cyan-500"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
                     disabled={isLoading}
                   />
                   Remember me

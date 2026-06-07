@@ -35,4 +35,8 @@ class TaskComment extends Model
     public function user() {
         return $this->belongsTo(User::class);
     }
+
+    public function attachment() {
+        return $this->hasOne(TaskFile::class, 'comment_id');
+    }
 }

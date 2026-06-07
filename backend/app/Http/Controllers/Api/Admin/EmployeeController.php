@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\UpdateUserRequest;
 use App\Http\Resources\UserResource;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\ActivityLogService;
 use App\Services\NotificationService;
 use App\Services\UserCreationService;
 use Illuminate\Http\JsonResponse;
@@ -22,9 +23,23 @@ class EmployeeController extends Controller
     public function index(Request $request): JsonResponse
     {
         $this->authorize('manageEmployees');
+        $companyId = auth()->user()->company_id;
         $employees = User::query()
-            ->with(['company:id,name', 'roles:id,name'])
-            ->where('company_id', auth()->user()->company_id)
+            ->with([
+                'company:id,name',
+                'roles:id,name',
+                'activeTasks' => fn ($query) => $query
+                    ->whereHas('project', fn ($projectQuery) => $projectQuery->where('company_id', $companyId))
+                    ->with('project:id,name')
+                    ->orderByDesc('updated_at'),
+            ])
+            ->withCount([
+                'tasks as total_assigned_tasks' => fn ($query) => $query->whereHas('project', fn ($projectQuery) => $projectQuery->where('company_id', $companyId)),
+                'tasks as pending_tasks' => fn ($query) => $query->where('status', 'pending')->whereHas('project', fn ($projectQuery) => $projectQuery->where('company_id', $companyId)),
+                'tasks as in_progress_tasks' => fn ($query) => $query->where('status', 'in_progress')->whereHas('project', fn ($projectQuery) => $projectQuery->where('company_id', $companyId)),
+                'tasks as completed_tasks' => fn ($query) => $query->where('status', 'completed')->whereHas('project', fn ($projectQuery) => $projectQuery->where('company_id', $companyId)),
+            ])
+            ->where('company_id', $companyId)
             ->whereHas('roles', fn ($query) => $query->where('name', Role::EMPLOYEE))
             ->orderBy('created_at', 'desc')
             ->paginate(15);
@@ -81,10 +96,23 @@ class EmployeeController extends Controller
             ], 404);
         }
 
-        $employee->fill($request->validated());
+        $data = $request->validated();
+        $previousStatus = $employee->status;
+        $data['avatar_url'] = $data['avatar_url'] ?? $data['avatar'] ?? $employee->avatar_url;
+        unset($data['avatar']);
+
+        $employee->fill($data);
         $employee->save();
 
-        $employee->load(['company:id,name', 'roles:id,name']);
+        if ($previousStatus !== $employee->status) {
+            if ($employee->status === 'active') {
+                ActivityLogService::logUserActivated(auth()->user(), $employee);
+            } elseif ($employee->status === 'inactive') {
+                ActivityLogService::logUserDeactivated(auth()->user(), $employee);
+            }
+        }
+
+        $this->loadPerformance($employee);
 
         return response()->json([
             'success' => true,
@@ -104,11 +132,56 @@ class EmployeeController extends Controller
             ], 404);
         }
 
-        $employee->load(['company:id,name', 'roles:id,name']);
+        $this->loadPerformance($employee);
 
         return response()->json([
             'success' => true,
             'data' => new UserResource($employee),
+        ]);
+    }
+
+    public function destroy(User $employee): JsonResponse
+    {
+        $this->authorize('manageEmployees');
+
+        if ($employee->company_id !== auth()->user()->company_id || ! $employee->hasRole(Role::EMPLOYEE)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Employee not found.',
+            ], 404);
+        }
+
+        if ($employee->id === auth()->id()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot delete yourself.',
+            ], 400);
+        }
+
+        $employee->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Employee deleted successfully.',
+        ]);
+    }
+
+    private function loadPerformance(User $employee): void
+    {
+        $companyId = auth()->user()->company_id;
+
+        $employee->load(['company:id,name', 'roles:id,name']);
+        $employee->loadCount([
+            'tasks as total_assigned_tasks' => fn ($query) => $query->whereHas('project', fn ($projectQuery) => $projectQuery->where('company_id', $companyId)),
+            'tasks as pending_tasks' => fn ($query) => $query->where('status', 'pending')->whereHas('project', fn ($projectQuery) => $projectQuery->where('company_id', $companyId)),
+            'tasks as in_progress_tasks' => fn ($query) => $query->where('status', 'in_progress')->whereHas('project', fn ($projectQuery) => $projectQuery->where('company_id', $companyId)),
+            'tasks as completed_tasks' => fn ($query) => $query->where('status', 'completed')->whereHas('project', fn ($projectQuery) => $projectQuery->where('company_id', $companyId)),
+        ]);
+        $employee->load([
+            'activeTasks' => fn ($query) => $query
+                ->whereHas('project', fn ($projectQuery) => $projectQuery->where('company_id', $companyId))
+                ->with('project:id,name')
+                ->orderByDesc('updated_at'),
         ]);
     }
 }

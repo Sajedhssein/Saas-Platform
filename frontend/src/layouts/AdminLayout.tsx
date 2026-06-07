@@ -39,6 +39,7 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
   const notificationUnreadCount = useNotificationStore((state) => state.unreadCount);
   const loadNotifications = useNotificationStore((state) => state.loadNotifications);
   const markNotificationAsRead = useNotificationStore((state) => state.markNotificationAsRead);
+  const markAllAsRead = useNotificationStore((state) => state.markAllAsRead);
   const role = authUser?.role ?? 'admin';
 
   useEffect(() => {
@@ -203,6 +204,7 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
           notificationUnreadCount={notificationUnreadCount}
           onNotificationClick={handleNotificationClick}
           onViewAllNotifications={() => navigate(getNotificationsPathForRole(role))}
+          onMarkAllNotificationsAsRead={() => void markAllAsRead()}
         />
 
         <main className="flex-1 overflow-auto">

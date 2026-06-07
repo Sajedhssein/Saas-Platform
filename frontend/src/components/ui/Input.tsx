@@ -138,6 +138,7 @@ interface SearchBarProps extends InputHTMLAttributes<HTMLInputElement> {
 
 export const SearchBar = ({
   placeholder = 'Search...',
+  className = '',
   ...props
 }: SearchBarProps) => {
   return (
@@ -145,7 +146,7 @@ export const SearchBar = ({
       {...props}
       placeholder={placeholder}
       icon={<Search size={20} />}
-      className="pl-11"
+      className={`pl-11 ${className}`}
     />
   );
 };

@@ -14,6 +14,8 @@ type ClientProjectRef = Pick<Project, 'id' | 'name' | 'progress' | 'status' | 't
 };
 
 type BackendClientRecord = Partial<ClientRecord> & {
+    company_name?: string | null;
+    avatar_url?: string | null;
     projects_count?: number | null;
     projectsCount?: number | null;
     latest_projects?: ClientProjectRef[] | null;
@@ -94,8 +96,9 @@ const extractClient = (payload: ClientRecord | ClientEnvelope | BackendClientRec
         id: source.id ?? '',
         name: source.name ?? 'Unnamed Client',
         email: source.email ?? '',
-        company: source.company ?? '',
-        avatar: source.avatar ?? '',
+        phone: source.phone ?? '',
+        company: source.company ?? source.company_name ?? '',
+        avatar: source.avatar ?? source.avatar_url ?? '',
         projects: Number(projectsCount ?? 0),
         projects_count: Number(projectsCount ?? 0),
         latest_projects: Array.isArray(latestProjectsSource) ? latestProjectsSource.map(normalizeLatestProject) : [],

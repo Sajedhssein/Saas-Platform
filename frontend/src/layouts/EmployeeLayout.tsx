@@ -27,6 +27,7 @@ export const EmployeeLayout = ({ children }: EmployeeLayoutProps) => {
   const notificationUnreadCount = useNotificationStore((state) => state.unreadCount);
   const loadNotifications = useNotificationStore((state) => state.loadNotifications);
   const markNotificationAsRead = useNotificationStore((state) => state.markNotificationAsRead);
+  const markAllAsRead = useNotificationStore((state) => state.markAllAsRead);
   const role = authUser?.role ?? 'employee';
 
   useEffect(() => {
@@ -184,6 +185,7 @@ export const EmployeeLayout = ({ children }: EmployeeLayoutProps) => {
           notificationUnreadCount={notificationUnreadCount}
           onNotificationClick={handleNotificationClick}
           onViewAllNotifications={() => navigate(getNotificationsPathForRole(role))}
+          onMarkAllNotificationsAsRead={() => void markAllAsRead()}
         />
 
         <main className="flex-1 overflow-auto">

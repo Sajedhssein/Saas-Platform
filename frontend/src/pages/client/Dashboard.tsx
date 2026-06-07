@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FolderOpen, CheckSquare, TrendingUp, BarChart3 } from 'lucide-react';
-import { DashboardCard, DataFetchError, EmptyState, LoadingSpinner, PageContainer, ProgressBar, StatusBadge } from '../../components/ui';
+import { FolderOpen, CheckSquare, TrendingUp, BarChart3, Files, MessageCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ActivityTimeline, DashboardCard, DataFetchError, EmptyState, LoadingSpinner, PageContainer, ProgressBar, QuickActions, StatusBadge } from '../../components/ui';
 import { clientDashboardService, clientProjectService } from '../../services';
 import type { Project } from '../../types/project';
 import type { ClientDashboardPayload } from '../../services/clientDashboardService';
@@ -36,6 +37,7 @@ const normalizeReportStatus = (status?: string | null): ReportBadgeStatus => {
 };
 
 export const ClientDashboard = () => {
+  const navigate = useNavigate();
   const [dashboard, setDashboard] = useState<ClientDashboardPayload | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,6 +116,14 @@ export const ClientDashboard = () => {
 
   return (
     <PageContainer title="Dashboard" description="Welcome! Here's your overview." titleClassName="text-black">
+      <QuickActions
+        actions={[
+          { label: 'Projects', description: 'View active and completed project work.', icon: <FolderOpen size={18} />, onClick: () => navigate('/client/projects') },
+          { label: 'Reports', description: 'Open shared reports and summaries.', icon: <BarChart3 size={18} />, onClick: () => navigate('/client/reports') },
+          { label: 'Files', description: 'Browse files shared with your projects.', icon: <Files size={18} />, onClick: () => navigate('/client/files') },
+          { label: 'Contact Team', description: 'Use notifications for team updates.', icon: <MessageCircle size={18} />, onClick: () => navigate('/client/notifications') },
+        ]}
+      />
       <div className="rounded-[1.75rem] border border-slate-200 bg-linear-to-br from-slate-50 via-white to-cyan-50 p-6 shadow-[0_18px_45px_rgba(15,23,42,0.06)] mb-8">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-3xl">
@@ -208,6 +218,15 @@ export const ClientDashboard = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="mt-8">
+        <ActivityTimeline
+          title="Recent Updates"
+          subtitle="Client-visible project, report, and file activity."
+          activities={dashboard.recent_updates ?? []}
+          emptyMessage="Project updates, shared files, and reports will appear here."
+        />
       </div>
     </PageContainer>
   );

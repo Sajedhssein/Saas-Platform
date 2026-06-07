@@ -16,6 +16,7 @@ import {
 } from 'recharts';
 import { ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import type { WorkloadData, ProjectProgress } from '../../types/dashboard';
+import { Avatar } from './Avatar';
 
 // Animated number without external deps
 const AnimatedNumber: React.FC<{ value: number; decimals?: number; className?: string }> = ({ value, decimals = 0, className }) => {
@@ -45,25 +46,6 @@ const AnimatedNumber: React.FC<{ value: number; decimals?: number; className?: s
   }, [value, decimals]);
 
   return <div className={className}>{decimals === 0 ? String(Math.round(display)) : display.toFixed(decimals)}</div>;
-};
-
-// Avatar fallback using initials
-const Avatar: React.FC<{ name?: string; size?: number }> = ({ name = 'U', size = 36 }) => {
-  const initials = name
-    .split(' ')
-    .map((s) => s[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-
-  return (
-    <div
-      style={{ width: size, height: size }}
-      className="flex items-center justify-center rounded-full bg-linear-to-br from-slate-50 to-white text-sm font-semibold text-slate-700"
-    >
-      {initials}
-    </div>
-  );
 };
 
 export const KpiCard: React.FC<{

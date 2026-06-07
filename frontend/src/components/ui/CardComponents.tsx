@@ -1,6 +1,7 @@
 import { Clock, FileText, FolderKanban, Users } from 'lucide-react';
 import type { Task, Project } from '../../types';
 import { StatusBadge } from './StatusBadge';
+import { Avatar } from './Avatar';
 
 interface TaskCardProps {
   task: Task;
@@ -40,12 +41,12 @@ export const TaskCard = ({ task, onClick }: TaskCardProps) => {
       <div className="flex items-center gap-3 mb-4">
         <div className="flex -space-x-2">
           {previewAssignees.map((assignee) => (
-            <img
+            <Avatar
               key={assignee.id}
-              src={assignee.avatar ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${assignee.name}`}
-              alt={assignee.name}
-              className="w-6 h-6 rounded-full border border-white"
-              title={assignee.name}
+              imageUrl={assignee.avatar}
+              name={assignee.name}
+              size="sm"
+              className="h-6 w-6 border border-white"
             />
           ))}
         </div>
@@ -127,18 +128,13 @@ export const ProjectCard = ({ project, onClick }: ProjectCardProps) => {
           <div className="flex items-center gap-2">
             <div className="flex -space-x-2">
               {teamMembers.slice(0, 3).map((member, idx) => (
-                <span
+                <Avatar
                   key={idx}
-                  className="flex h-6 w-6 items-center justify-center rounded-full border border-white bg-slate-900 text-[10px] font-semibold text-white"
-                  title={member.name}
-                >
-                  {member.name
-                    .split(/\s+/)
-                    .filter(Boolean)
-                    .slice(0, 2)
-                    .map((part) => part[0]?.toUpperCase() ?? '')
-                    .join('') || 'EM'}
-                </span>
+                  imageUrl={member.avatar}
+                  name={member.name}
+                  size="sm"
+                  className="h-6 w-6 border border-white text-[10px]"
+                />
               ))}
             </div>
             {teamMembers.length > 3 && (

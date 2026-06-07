@@ -12,6 +12,8 @@ import {
   PageContainer,
   SearchBar,
   EmptyState,
+  Avatar,
+  PerformanceCard,
 } from '../../components/ui';
 import type { Employee } from '../../types';
 import {
@@ -30,9 +32,6 @@ interface EmployeeFormState {
   status: string;
   avatar: string;
 }
-
-const defaultAvatar = (name: string): string =>
-  `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name || 'Employee')}`;
 
 const emptyFormState: EmployeeFormState = {
   name: '',
@@ -53,9 +52,14 @@ const normalizeEmployee = (employee: EmployeeRecord): Employee => ({
   phone: employee.phone ?? '',
   status: employee.status ?? '',
   joinedDate: employee.joinedDate ?? employee.createdAt ?? employee.created_at ?? '',
-  avatar: employee.avatar || defaultAvatar(employee.name || 'Employee'),
-  performance: Number(employee.performance as number ?? 0),
-  completedTasks: Number(employee.completedTasks as number ?? 0),
+  avatar: employee.avatar || '',
+  performance: Number(employee.completion_rate ?? employee.performance ?? 0),
+  completedTasks: Number(employee.completed_tasks ?? employee.completedTasks ?? 0),
+  totalAssignedTasks: Number(employee.total_assigned_tasks ?? 0),
+  inProgressTasks: Number(employee.in_progress_tasks ?? 0),
+  todoTasks: Number(employee.todo_tasks ?? employee.pending_tasks ?? 0),
+  completionRate: Number(employee.completion_rate ?? 0),
+  activeTasks: employee.active_tasks ?? [],
   department: employee.department || 'General',
 });
 
@@ -140,6 +144,20 @@ export const AdminEmployees = () => {
     navigate('/admin/invites?role=employee');
   };
 
+  const openEditModal = (employee: Employee) => {
+    setSelectedEmployee(employee);
+    setFormData({
+      name: employee.name,
+      email: employee.email,
+      phone: employee.phone ?? '',
+      position: employee.position ?? '',
+      department: employee.department ?? '',
+      status: employee.status || 'active',
+      avatar: employee.avatar || '',
+    });
+    setFormOpen(true);
+  };
+
   const openDetailsModal = async (employee: Employee) => {
     setDetailsOpen(true);
     setSelectedDetailsEmployee(null);
@@ -188,7 +206,7 @@ export const AdminEmployees = () => {
       position: formData.position.trim() || 'Employee',
       department: formData.department.trim() || 'General',
       status: formData.status.trim() || 'active',
-      avatar: formData.avatar.trim() || defaultAvatar(formData.name.trim()),
+      avatar: formData.avatar.trim(),
       role: 'employee',
     };
 
@@ -343,21 +361,23 @@ export const AdminEmployees = () => {
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-linear-to-br from-slate-100 to-slate-200 text-xl font-semibold text-slate-900">
-                {selectedDetailsEmployee?.name
-                  .split(' ')
-                  .map((part) => part[0] ?? '')
-                  .slice(0, 2)
-                  .join('')
-                  .toUpperCase()}
-              </div>
+              <Avatar imageUrl={selectedDetailsEmployee?.avatar} name={selectedDetailsEmployee?.name} size="lg" />
               <div>
                 <p className="text-lg font-semibold text-slate-900">{selectedDetailsEmployee?.name ?? 'Not provided'}</p>
                 <p className="text-sm text-slate-500">{selectedDetailsEmployee?.email ?? 'Not provided'}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" >
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  if (selectedDetailsEmployee) {
+                    closeDetailsModal();
+                    openEditModal(selectedDetailsEmployee);
+                  }
+                }}
+              >
                 Edit
               </Button>
               <Button type="button" onClick={closeDetailsModal}>Close</Button>
@@ -390,6 +410,15 @@ export const AdminEmployees = () => {
               <p className="mt-2 text-sm font-medium text-slate-900">{selectedDetailsEmployee?.joinedDate || 'Not provided'}</p>
             </div>
           </div>
+
+          <PerformanceCard
+            totalAssigned={selectedDetailsEmployee?.totalAssignedTasks ?? 0}
+            completed={selectedDetailsEmployee?.completedTasks ?? 0}
+            inProgress={selectedDetailsEmployee?.inProgressTasks ?? 0}
+            todo={selectedDetailsEmployee?.todoTasks ?? 0}
+            completionRate={selectedDetailsEmployee?.completionRate ?? selectedDetailsEmployee?.performance ?? 0}
+            activeTasks={selectedDetailsEmployee?.activeTasks ?? []}
+          />
         </div>
       </Modal>
 
@@ -481,7 +510,7 @@ export const AdminEmployees = () => {
               value={formData.avatar}
               onChange={(event) => handleChange('avatar', event.target.value)}
               placeholder="https://..."
-              helpText="Optional. Leave empty to auto-generate an avatar."
+              helpText="Optional. Leave empty to use the initial fallback."
               disabled={isSubmitting}
             />
           </div>

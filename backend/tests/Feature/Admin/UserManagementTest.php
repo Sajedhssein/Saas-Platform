@@ -329,6 +329,73 @@ class UserManagementTest extends TestCase
         ]);
     }
 
+    public function test_update_client_status_persists_status_and_is_active(): void
+    {
+        $client = User::factory()->create([
+            'company_id' => $this->company->id,
+            'name' => 'Status Client',
+            'email' => 'status-client@test.com',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+        $client->roles()->attach(Role::firstOrCreateByName('client'));
+
+        $response = $this->actingAs($this->admin, 'api')
+            ->putJson("/api/admin/clients/{$client->id}", [
+                'status' => 'inactive',
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.status', 'inactive')
+            ->assertJsonPath('data.is_active', false);
+
+        $this->assertDatabaseHas('users', [
+            'id' => $client->id,
+            'status' => 'inactive',
+            'is_active' => false,
+        ]);
+    }
+
+    public function test_delete_employee_soft_deletes_employee(): void
+    {
+        $employee = User::factory()->create([
+            'company_id' => $this->company->id,
+            'email' => 'delete-employee@test.com',
+        ]);
+        $employee->roles()->attach(Role::firstOrCreateByName('employee'));
+
+        $response = $this->actingAs($this->admin, 'api')
+            ->deleteJson("/api/admin/employees/{$employee->id}");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'message' => 'Employee deleted successfully.',
+            ]);
+
+        $this->assertSoftDeleted('users', ['id' => $employee->id]);
+    }
+
+    public function test_delete_client_soft_deletes_client(): void
+    {
+        $client = User::factory()->create([
+            'company_id' => $this->company->id,
+            'email' => 'delete-client@test.com',
+        ]);
+        $client->roles()->attach(Role::firstOrCreateByName('client'));
+
+        $response = $this->actingAs($this->admin, 'api')
+            ->deleteJson("/api/admin/clients/{$client->id}");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'message' => 'Client deleted successfully.',
+            ]);
+
+        $this->assertSoftDeleted('users', ['id' => $client->id]);
+    }
+
     public function test_update_client_company_isolation_returns_404(): void
     {
         $otherCompany = Company::factory()->create();

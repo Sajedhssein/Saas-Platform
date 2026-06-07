@@ -22,15 +22,21 @@ class ResetPasswordNotification extends Notification
     public function toMail($notifiable): MailMessage
     {
         $frontendUrl = rtrim((string) env('FRONTEND_URL', 'https://frontend-domain'), '/');
-        $resetUrl = sprintf('%s/reset-password/%s', $frontendUrl, urlencode($this->token));
+        $resetUrl = sprintf(
+            '%s/reset-password?token=%s&email=%s',
+            $frontendUrl,
+            urlencode($this->token),
+            urlencode($notifiable->email)
+        );
+        $expireMinutes = config('auth.passwords.'.config('auth.defaults.passwords').'.expire');
 
         return (new MailMessage)
             ->subject('Reset Your Password')
-            ->greeting('Hello,')
-            ->line('You are receiving this email because we received a password reset request for your account.')
-            ->line('Click the button below to reset your password.')
             ->action('Reset Password', $resetUrl)
-            ->line('If you did not request a password reset, no further action is required.')
-            ->line('This password reset link will expire in '.config('auth.passwords.'.config('auth.defaults.passwords').'.expire').' minutes.');
+            ->view('emails.reset-password', [
+                'email' => $notifiable->email,
+                'resetUrl' => $resetUrl,
+                'expireMinutes' => $expireMinutes,
+            ]);
     }
 }

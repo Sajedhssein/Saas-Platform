@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Client;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ReportResource;
 use App\Models\Report;
+use App\Services\ActivityLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -43,6 +44,7 @@ class ReportController extends Controller
         }
 
         $this->authorize('view', $report);
+        ActivityLogService::logReportViewed($user, $report);
 
         return response()->json([
             'success' => true,

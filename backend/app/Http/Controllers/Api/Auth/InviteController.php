@@ -104,6 +104,7 @@ class InviteController extends Controller
 
         // issue tokens
         $token = auth('api')->login($user);
+        $user->forceFill(['last_login_at' => now()])->save();
         $refresh = $this->refreshTokenService->createForUser($user, $request->userAgent() ?? null, $request->ip());
 
         return response()->json([
@@ -113,7 +114,7 @@ class InviteController extends Controller
                 'token' => $token,
                 'refresh_token' => $refresh['plain'],
                 'refresh_expires_at' => optional($refresh['model']->expires_at)->getTimestamp(),
-                'user' => $user,
+                'user' => $user->fresh()->load('roles', 'company'),
             ],
         ], 201);
     }

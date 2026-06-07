@@ -1,3 +1,5 @@
+import type { ActivityLog } from './activity';
+
 export type ProjectStatus = 'pending' | 'in-progress' | 'completed' | 'on-hold';
 
 export type EmployeeTaskStatus = 'pending' | 'in-progress' | 'completed' | 'overdue';
@@ -48,6 +50,8 @@ export interface DashboardStats {
     delayedTasks: number;
     projectProgress: ProjectProgress[];
     weeklyProductivity: WeeklyProductivityItem[];
+    recentActivity: ActivityLog[];
+    recent_activity: ActivityLog[];
 }
 
 export interface WorkloadData {
@@ -142,12 +146,20 @@ export interface EmployeeDashboardSummary {
     overdue_tasks: number;
     my_projects: number;
     completion_rate: number;
+    completed_this_week: number;
+    projects_this_week: number;
+    active_tasks: number;
+    unread_notifications_count: number;
     myTasks: number;
     completedTasks: number;
     pendingTasks: number;
     overdueTasks: number;
     myProjects: number;
     completionRate: number;
+    completedThisWeek: number;
+    projectsThisWeek: number;
+    activeTasks: number;
+    unreadNotificationsCount: number;
 }
 
 export interface EmployeeDashboard {
@@ -157,6 +169,10 @@ export interface EmployeeDashboard {
     overdue_tasks: number;
     my_projects: number;
     completion_rate: number;
+    completed_this_week: number;
+    projects_this_week: number;
+    active_tasks: number;
+    unread_notifications_count: number;
     recent_tasks: EmployeeDashboardTask[];
     notifications: EmployeeDashboardNotification[];
     weekly_productivity?: EmployeeWeeklyProductivityItem[];
@@ -167,8 +183,14 @@ export interface EmployeeDashboard {
     overdueTasks: number;
     myProjects: number;
     completionRate: number;
+    completedThisWeek: number;
+    projectsThisWeek: number;
+    activeTasks: number;
+    unreadNotificationsCount: number;
     recentTasks: EmployeeDashboardTask[];
     trendData?: EmployeeWeeklyProductivityItem[];
+    recentActivity: ActivityLog[];
+    recent_activity: ActivityLog[];
 }
 
 export interface DashboardStatsResponse {

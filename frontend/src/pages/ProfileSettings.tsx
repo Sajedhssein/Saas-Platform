@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { toast } from 'react-hot-toast';
 import { Bell, Globe, Loader2, Lock, Settings } from 'lucide-react';
-import { Button, DataFetchError, Input, PageContainer } from '../components/ui';
+import { Avatar, Button, DataFetchError, Input, PageContainer } from '../components/ui';
 import { authService } from '../services/authService';
 import { settingsService, SettingsValidationError } from '../services/settingsService';
 import useAuthStore from '../store/authStore';
@@ -26,6 +26,7 @@ interface EmployeeGeneralSettings {
   name: string;
   email: string;
   phone: string;
+  avatar: string;
   department: string;
   position: string;
 }
@@ -55,6 +56,7 @@ const normalizeGeneralSettings = (user: Partial<AppUser> | null | undefined): Em
   name: user?.name ?? '',
   email: user?.email ?? '',
   phone: user?.phone ?? '',
+  avatar: user?.avatar ?? '',
   department: user?.department ?? '',
   position: user?.position ?? '',
 });
@@ -71,6 +73,7 @@ export const ProfileSettings = () => {
   const [generalLoaded, setGeneralLoaded] = useState(Boolean(authUser));
   const [generalLoading, setGeneralLoading] = useState(true);
   const [generalSaving, setGeneralSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [generalFieldErrors, setGeneralFieldErrors] = useState<GeneralFieldErrors>({});
 
@@ -240,6 +243,32 @@ export const ProfileSettings = () => {
     }
   };
 
+  const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      setAvatarUploading(true);
+      setGeneralError(null);
+      const updated = await authService.uploadProfileAvatar(file);
+      setGeneralSettings(normalizeGeneralSettings(updated));
+
+      if (token) {
+        login(updated, token);
+      }
+
+      toast.success('Profile picture updated.');
+    } catch (error) {
+      setGeneralError(error instanceof Error ? error.message : 'Failed to upload profile picture');
+    } finally {
+      setAvatarUploading(false);
+      event.target.value = '';
+    }
+  };
+
   const handleSecuritySubmit = async () => {
     if (!currentPassword.trim()) {
       setSecurityFieldErrors({ current_password: 'Current password is required.' });
@@ -341,6 +370,25 @@ export const ProfileSettings = () => {
           <h3 className="mb-4 text-lg font-semibold text-slate-900">General Settings</h3>
           <div className="space-y-4">
             {renderSectionError(generalError, () => void loadGeneralSettings())}
+            <div className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-4">
+                <Avatar imageUrl={generalSettings.avatar} name={generalSettings.name} size="lg" />
+                <div>
+                  <p className="text-sm font-semibold leading-6 text-slate-900">Profile picture</p>
+                  <p className="text-sm leading-6 text-slate-600">Upload a JPG, PNG, or WebP image up to 2 MB.</p>
+                </div>
+              </div>
+              <label className="inline-flex h-11 cursor-pointer items-center justify-center rounded-2xl border border-slate-300 bg-white px-5 text-sm font-semibold leading-none text-slate-900 transition-colors hover:bg-slate-50">
+                {avatarUploading ? 'Uploading...' : 'Upload Photo'}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="sr-only"
+                  onChange={(event) => void handleAvatarChange(event)}
+                  disabled={avatarUploading || generalSaving}
+                />
+              </label>
+            </div>
             <Input
               label="Name"
               placeholder="Your name"
@@ -524,7 +572,7 @@ export const ProfileSettings = () => {
     }
   };
 
-  const isSaving = generalSaving || securitySaving || notificationSaving || preferencesSaving;
+  const isSaving = generalSaving || avatarUploading || securitySaving || notificationSaving || preferencesSaving;
 
   return (
     <PageContainer title="Profile Settings" description="Manage your employee profile and workspace preferences.">

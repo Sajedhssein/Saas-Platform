@@ -1,5 +1,6 @@
 import { ProgressBar } from './StatusBadge';
 import type { Employee } from '../../types';
+import { Avatar } from './Avatar';
 
 interface EmployeeTableProps {
   employees: Employee[];
@@ -20,11 +21,7 @@ export const EmployeeTable = ({
           className="bg-white rounded-md border border-slate-200 p-4 sm:p-5 hover:border-slate-300 hover:shadow-sm cursor-pointer transition-colors"
         >
           <div className="flex items-start gap-3 mb-3 sm:mb-4">
-            <img
-              src={employee.avatar}
-              alt={employee.name}
-              className="w-10 h-10 sm:w-12 sm:h-12 rounded-full shrink-0"
-            />
+            <Avatar imageUrl={employee.avatar} name={employee.name} size="md" className="sm:h-12 sm:w-12" />
             <div className="min-w-0 flex-1">
               <p className="text-sm sm:text-base font-semibold text-slate-900 truncate">
                 {employee.name}
@@ -102,11 +99,7 @@ export const EmployeeTable = ({
               >
                 <td className="px-4 md:px-6 py-4">
                   <div className="flex items-center gap-3">
-                    <img
-                      src={employee.avatar}
-                      alt={employee.name}
-                      className="w-10 h-10 rounded-full shrink-0"
-                    />
+                    <Avatar imageUrl={employee.avatar} name={employee.name} size="md" />
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-slate-900 truncate">
                         {employee.name}

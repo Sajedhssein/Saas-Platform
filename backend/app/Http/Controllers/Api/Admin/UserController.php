@@ -9,6 +9,7 @@ use App\Http\Requests\Admin\UpdateUserRequest;
 use App\Http\Resources\UserResource;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\ActivityLogService;
 use App\Services\UserCreationService;
 use App\Services\RefreshTokenService;
 use Illuminate\Http\JsonResponse;
@@ -169,6 +170,8 @@ class UserController extends Controller
             'token_invalidated_at' => now(),
         ]);
 
+        ActivityLogService::logUserDeactivated(auth()->user(), $user);
+
         // Revoke all refresh tokens for the user
         $this->refreshTokenService->revokeAllForUser($user);
 
@@ -189,6 +192,8 @@ class UserController extends Controller
         }
 
         $user->update(['status' => 'active']);
+
+        ActivityLogService::logUserActivated(auth()->user(), $user);
 
         return response()->json([
             'success' => true,

@@ -4,6 +4,7 @@ import { AlertCircle, ArrowRight, CheckCircle2, Clock3, Lock, Mail, ShieldAlert,
 import { Button, Input } from '../../components/ui';
 import { authService } from '../../services/authService';
 import useAuthStore from '../../store/authStore';
+import type { User as AuthUser } from '../../types';
 import type { AxiosError } from 'axios';
 import { getDashboardPathForUser } from '../../utils/auth';
 
@@ -273,7 +274,10 @@ export const AcceptInvite = () => {
       setInviteMessage('');
 
       // Ensure response.user has a usable role; fall back to invite.role if missing
-      const userToLogin = { ...(response.user ?? {} as any) } as any;
+      const userToLogin: AuthUser = {
+        ...(response.user ?? {}),
+        role: response.user?.role ?? invite.role,
+      } as AuthUser;
       if (!userToLogin.role && invite?.role) {
         userToLogin.role = invite.role;
       }
@@ -282,7 +286,7 @@ export const AcceptInvite = () => {
       if (import.meta.env.DEV) {
         console.debug('[acceptInvite] success response', response);
       }
-      login(userToLogin as any, response.token);
+      login(userToLogin, response.token);
 
 
       try {
@@ -311,7 +315,7 @@ export const AcceptInvite = () => {
 
       // Sanity check: ensure auth store shows authenticated state; log if not
       try {
-        const state = (useAuthStore as any).getState ? (useAuthStore as any).getState() : null;
+        const state = useAuthStore.getState();
         if (import.meta.env.DEV) {
           console.log('[acceptInvite] post-login auth state', state);
         }

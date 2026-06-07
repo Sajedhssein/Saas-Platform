@@ -14,6 +14,7 @@ class TaskFile extends Model
     protected $fillable = [
         'task_id',
         'uploaded_by',
+        'comment_id',
         'file_name',
         'file_path',
         'file_type',
@@ -25,6 +26,10 @@ class TaskFile extends Model
     }
     public function uploader() {
         return $this->belongsTo(User::class, 'uploaded_by');
+    }
+
+    public function comment() {
+        return $this->belongsTo(TaskComment::class, 'comment_id');
     }
 
 }

@@ -155,6 +155,11 @@ class ProjectController extends Controller
             $project->employees()->sync($employeeIds);
         }
 
+        ActivityLogService::logProjectUpdated(auth()->user(), $project, [
+            'old_values' => ['status' => $previousStatus],
+            'new_values' => ['status' => $project->status],
+        ]);
+
         if ($previousStatus !== 'completed' && $project->status === 'completed') {
             ActivityLogService::logProjectCompleted(auth()->user(), $project);
             NotificationService::notifyUser(

@@ -15,6 +15,23 @@ export interface EmployeeRecord extends User {
     joinedDate?: string;
     createdAt?: string;
     created_at?: string;
+    total_assigned_tasks?: number | null;
+    completed_tasks?: number | null;
+    in_progress_tasks?: number | null;
+    pending_tasks?: number | null;
+    todo_tasks?: number | null;
+    completion_rate?: number | null;
+    active_tasks?: Array<{
+        id: string;
+        title: string;
+        status: 'pending' | 'in_progress' | 'completed';
+        progress?: number;
+        deadline?: string | null;
+        project?: {
+            id: string;
+            name: string;
+        } | null;
+    }>;
 }
 
 export interface CreateEmployeePayload {

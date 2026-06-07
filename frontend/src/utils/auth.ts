@@ -78,7 +78,7 @@ export const resolveUserRole = (user: RoleLike | null | undefined): User['role']
     return extractRoleCandidate(user.role) ?? (Array.isArray(user.roles) ? user.roles.map(extractRoleCandidate).find(Boolean) ?? null : extractRoleCandidate(user.roles));
 };
 
-export const normalizeAuthUser = <T extends RoleLike & { id?: string; name?: string; email?: string; avatar?: string }>(user: T | null | undefined): (User & T) | undefined => {
+export const normalizeAuthUser = <T extends RoleLike & { id?: string; name?: string; email?: string; avatar?: string; avatar_url?: string }>(user: T | null | undefined): (User & T) | undefined => {
     if (!user) {
         return undefined;
     }
@@ -91,6 +91,7 @@ export const normalizeAuthUser = <T extends RoleLike & { id?: string; name?: str
 
     return {
         ...user,
+        avatar: typeof user.avatar === 'string' ? user.avatar : typeof user.avatar_url === 'string' ? user.avatar_url : undefined,
         role: resolvedRole,
     };
 };

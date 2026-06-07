@@ -10,3 +10,5 @@ export { clientFileService } from './clientFileService';
 export { inviteService } from './inviteService';
 export { enterpriseReportService } from './enterpriseReportService';
 export { settingsService, SettingsValidationError } from './settingsService';
+export { activityService } from './activityService';
+export type { ActivityPeriod } from './activityService';

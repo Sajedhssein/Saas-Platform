@@ -21,6 +21,7 @@ import type {
     TopPerformer,
     TopClient,
 } from '../types/dashboard';
+import type { ActivityLog } from '../types/activity';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -100,6 +101,43 @@ const normalizeStatus = (value: unknown, progress: number): EmployeeDashboardTas
     }
 
     return 'pending';
+};
+
+const normalizeActivityUser = (value: unknown): ActivityLog['user'] => {
+    if (!isRecord(value)) {
+        return null;
+    }
+
+    return {
+        id: pickString(value, ['id', 'user_id', 'userId'], 'system'),
+        name: pickString(value, ['name', 'display_name', 'displayName'], 'System'),
+        avatar: pickString(value, ['avatar', 'avatar_url', 'avatarUrl'], '') || null,
+    };
+};
+
+const normalizeActivityLog = (item: unknown, index: number): ActivityLog | null => {
+    if (!isRecord(item)) {
+        return null;
+    }
+
+    return {
+        id: pickString(item, ['id', 'activity_id', 'activityId'], `activity-${index}`),
+        action: pickString(item, ['action', 'type'], 'activity'),
+        description: pickString(item, ['description', 'message'], 'Activity recorded'),
+        metadata: isRecord(item.metadata) ? item.metadata : null,
+        user: normalizeActivityUser(item.user),
+        created_at: pickString(item, ['created_at', 'createdAt', 'timestamp'], new Date().toISOString()),
+    };
+};
+
+const normalizeActivityLogs = (value: unknown): ActivityLog[] => {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .map((item, index) => normalizeActivityLog(item, index))
+        .filter((item): item is ActivityLog => item !== null);
 };
 
 const defaultClientAnalytics = (): ClientAnalytics => ({
@@ -252,6 +290,7 @@ const normalizeStats = (payload: unknown): DashboardStats => {
 
     const projectProgressOverview = parseProjectProgressOverview(payload.project_progress_overview ?? payload.projectProgressOverview);
     const weeklyProductivity = parseWeeklyProductivity(payload.weekly_productivity ?? payload.weeklyProductivity);
+    const recentActivity = normalizeActivityLogs(payload.recent_activity ?? payload.recentActivity);
     const totalTasks = pickNumber(payload, ['total_tasks', 'totalTasks']);
     const completedTasks = pickNumber(payload, ['completed_tasks', 'completedTasks']);
     const activeTasks = pickNumber(payload, ['active_tasks', 'in_progress_tasks', 'inProgressTasks']);
@@ -291,6 +330,7 @@ const normalizeStats = (payload: unknown): DashboardStats => {
         project_completion_rate: projectCompletionRate,
         project_progress: projectProgress,
         weekly_productivity: weeklyProductivity,
+        recent_activity: recentActivity,
         totalProjects,
         activeProjects,
         completedProjects,
@@ -305,6 +345,7 @@ const normalizeStats = (payload: unknown): DashboardStats => {
         delayedTasks,
         projectProgress,
         weeklyProductivity,
+        recentActivity,
     };
 };
 
@@ -440,7 +481,7 @@ const normalizeEmployeeWeeklyProductivity = (value: unknown): EmployeeWeeklyProd
         .filter((item): item is EmployeeWeeklyProductivityItem => item !== null);
 };
 
-const deriveEmployeeSummary = (tasks: EmployeeDashboardTask[], payload: UnknownRecord): Pick<EmployeeDashboard, 'my_tasks' | 'completed_tasks' | 'pending_tasks' | 'overdue_tasks' | 'my_projects' | 'completion_rate'> => {
+const deriveEmployeeSummary = (tasks: EmployeeDashboardTask[], payload: UnknownRecord): Pick<EmployeeDashboard, 'my_tasks' | 'completed_tasks' | 'pending_tasks' | 'overdue_tasks' | 'my_projects' | 'completion_rate' | 'completed_this_week' | 'projects_this_week' | 'active_tasks' | 'unread_notifications_count'> => {
     const myTasks = pickNumber(payload, ['my_tasks', 'assigned_tasks', 'total_tasks', 'tasks_count'], tasks.length);
     const completedTasks = pickNumber(payload, ['completed_tasks', 'completedTasks'], tasks.filter((task) => task.status === 'completed').length);
     const pendingTasks = pickNumber(payload, ['pending_tasks', 'pendingTasks'], tasks.filter((task) => task.status === 'pending').length);
@@ -460,6 +501,10 @@ const deriveEmployeeSummary = (tasks: EmployeeDashboardTask[], payload: UnknownR
         overdue_tasks: overdueTasks,
         my_projects: myProjects,
         completion_rate: completionRate,
+        completed_this_week: pickNumber(payload, ['completed_this_week', 'completedThisWeek'], completedTasks),
+        projects_this_week: pickNumber(payload, ['projects_this_week', 'projectsThisWeek'], myProjects),
+        active_tasks: pickNumber(payload, ['active_tasks', 'activeTasks'], tasks.filter((task) => task.status !== 'completed').length),
+        unread_notifications_count: pickNumber(payload, ['unread_notifications_count', 'unreadNotificationsCount']),
     };
 };
 
@@ -473,6 +518,10 @@ const normalizeEmployeeDashboard = (payload: unknown): EmployeeDashboard => {
             overdue_tasks: 0,
             my_projects: 0,
             completion_rate: 0,
+            completed_this_week: 0,
+            projects_this_week: 0,
+            active_tasks: 0,
+            unread_notifications_count: 0,
             recent_tasks: emptyTasks,
             notifications: [],
             weekly_productivity: [],
@@ -483,8 +532,14 @@ const normalizeEmployeeDashboard = (payload: unknown): EmployeeDashboard => {
             overdueTasks: 0,
             myProjects: 0,
             completionRate: 0,
+            completedThisWeek: 0,
+            projectsThisWeek: 0,
+            activeTasks: 0,
+            unreadNotificationsCount: 0,
             recentTasks: emptyTasks,
             trendData: [],
+            recent_activity: [],
+            recentActivity: [],
         };
     }
 
@@ -492,8 +547,12 @@ const normalizeEmployeeDashboard = (payload: unknown): EmployeeDashboard => {
     const recentTasksSource = source.recent_tasks ?? source.recentTasks ?? source.tasks ?? [];
     const notificationsSource = source.notifications ?? source.recent_notifications ?? source.recentNotifications ?? [];
     const weeklyProductivitySource = source.weekly_productivity ?? source.weeklyProductivity ?? [];
+    const recentActivity = normalizeActivityLogs(source.recent_activity ?? source.recentActivity);
     const recentTasks = Array.isArray(recentTasksSource) ? recentTasksSource.map(normalizeEmployeeTask) : [];
-    const summary = deriveEmployeeSummary(recentTasks, source);
+    const summarySource = isRecord(source.summary)
+        ? { ...source.summary, unread_notifications_count: source.unread_notifications_count }
+        : source;
+    const summary = deriveEmployeeSummary(recentTasks, summarySource);
     const weeklyProductivity = normalizeEmployeeWeeklyProductivity(weeklyProductivitySource);
 
     return {
@@ -502,14 +561,20 @@ const normalizeEmployeeDashboard = (payload: unknown): EmployeeDashboard => {
         notifications: Array.isArray(notificationsSource) ? notificationsSource.map(normalizeEmployeeNotification) : [],
         weekly_productivity: weeklyProductivity,
         weeklyProductivity,
+        recent_activity: recentActivity,
         myTasks: summary.my_tasks,
         completedTasks: summary.completed_tasks,
         pendingTasks: summary.pending_tasks,
         overdueTasks: summary.overdue_tasks,
         myProjects: summary.my_projects,
         completionRate: summary.completion_rate,
+        completedThisWeek: summary.completed_this_week,
+        projectsThisWeek: summary.projects_this_week,
+        activeTasks: summary.active_tasks,
+        unreadNotificationsCount: summary.unread_notifications_count,
         recentTasks,
         trendData: weeklyProductivity,
+        recentActivity,
     };
 };
 

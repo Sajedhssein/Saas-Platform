@@ -9,9 +9,13 @@ use App\Http\Requests\UpdateTaskCommentRequest;
 use App\Http\Resources\TaskCommentResource;
 use App\Models\Task;
 use App\Models\TaskComment;
+use App\Models\TaskFile;
 use App\Services\ActivityLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class CommentController extends Controller
 {
@@ -37,6 +41,41 @@ class CommentController extends Controller
             'comment' => $request->input('content'),
         ]);
 
+        $supportsCommentAttachments = Schema::hasColumn('task_files', 'comment_id');
+
+        if ($request->hasFile('attachment')) {
+            $file = $request->file('attachment');
+            $originalName = $file->getClientOriginalName();
+            $storageName = Str::uuid().'_'.$originalName;
+            $path = Storage::disk(config('filesystems.default'))->putFileAs(
+                "tasks/{$task->id}/comments/{$comment->id}",
+                $file,
+                $storageName
+            );
+
+            $filePayload = [
+                'task_id' => $task->id,
+                'uploaded_by' => $user->id,
+                'file_name' => $originalName,
+                'file_path' => $path,
+                'file_type' => $file->getClientMimeType(),
+                'file_size' => $file->getSize(),
+            ];
+
+            if ($supportsCommentAttachments) {
+                $filePayload['comment_id'] = $comment->id;
+            }
+
+            TaskFile::create($filePayload);
+
+            ActivityLogService::logFileUploaded(
+                $user->id,
+                $task->id,
+                $originalName,
+                $file->getSize()
+            );
+        }
+
         // Log comment creation
         ActivityLogService::logCommentCreated(
             auth()->id(),
@@ -50,7 +89,7 @@ class CommentController extends Controller
 
         return response()->json([
             'message' => 'Comment added successfully',
-            'data' => new TaskCommentResource($comment),
+            'data' => new TaskCommentResource($comment->load($supportsCommentAttachments ? ['user', 'attachment'] : ['user'])),
         ], Response::HTTP_CREATED);
     }
 
@@ -74,7 +113,7 @@ class CommentController extends Controller
         $perPage = 15;
         $sortBy = request()->query('sort', 'newest'); // newest or oldest
 
-        $query = $task->comments()->with('user');
+        $query = $task->comments()->with(Schema::hasColumn('task_files', 'comment_id') ? ['user', 'attachment'] : ['user']);
 
         // Apply sorting
         if ($sortBy === 'oldest') {

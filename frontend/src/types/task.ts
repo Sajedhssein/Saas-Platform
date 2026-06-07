@@ -54,6 +54,7 @@ export interface TaskComment {
     task_id?: string;
     message: string;
     content?: string;
+    attachment?: TaskFile | null;
     user_id?: string;
     user?: TaskCommentAuthor | null;
     author?: TaskCommentAuthor | null;

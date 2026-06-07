@@ -1,4 +1,5 @@
 import api from '../api/axios';
+import type { ActivityLog } from '../types/activity';
 import { makeError } from '../utils/error';
 
 export interface ClientDashboardPayload {
@@ -20,6 +21,7 @@ export interface ClientDashboardPayload {
         status: string;
         generated_at: string | null;
     }>;
+    recent_updates?: ActivityLog[];
 }
 
 const getDashboardErrorMessage = (error: unknown): string => {

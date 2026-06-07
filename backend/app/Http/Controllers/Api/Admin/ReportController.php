@@ -88,6 +88,7 @@ class ReportController extends Controller
 
         $this->authorizeReportAccess($report);
         $this->authorize('view', $report);
+        ActivityLogService::logReportViewed(auth()->user(), $report);
 
         return response()->json([
             'success' => true,
@@ -192,6 +193,7 @@ class ReportController extends Controller
         }
 
         $this->ensureReportFileExists($report);
+        ActivityLogService::logReportViewed($user, $report);
 
         return $this->reportService->view($report);
     }

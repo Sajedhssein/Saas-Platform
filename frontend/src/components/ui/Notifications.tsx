@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Bell, LogOut, Settings, ChevronDown, BellRing, FileBarChart, UserPlus, ShieldCheck, ClipboardCheck } from 'lucide-react';
 import { formatRelativeTime, resolveNotificationCategory } from '../../services/notificationService';
 import type { Notification } from '../../types';
+import { Avatar } from './Avatar';
 
 interface NotificationButtonProps {
   notifications?: Notification[];
@@ -17,6 +18,7 @@ export const NotificationButton = ({
   onNotificationClick,
   unreadCount,
   onViewAll,
+  onMarkAllAsRead,
 }: NotificationButtonProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -205,17 +207,7 @@ export const ProfileDropdown = ({
         className="flex items-center gap-1 sm:gap-2 p-2 hover:bg-slate-100 rounded-lg transition-colors min-h-11 min-w-11"
         aria-label="Profile menu"
       >
-        <div className="w-8 h-8 overflow-hidden rounded-full bg-linear-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-sm font-semibold shrink-0 ring-1 ring-white/20 shadow-sm">
-          {userAvatar ? (
-            <img
-              src={userAvatar}
-              alt={userName || 'User avatar'}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            (userName.trim().charAt(0) || 'U').toUpperCase()
-          )}
-        </div>
+        <Avatar imageUrl={userAvatar} name={userName} size="sm" />
         <ChevronDown size={16} className="text-slate-600 shrink-0 hidden sm:inline" />
       </button>
 

@@ -2,6 +2,7 @@ export interface ActivityUser {
     id: string;
     name: string;
     avatar?: string | null;
+    avatar_url?: string | null;
 }
 
 export type ActivityMetadata = Record<string, unknown>;

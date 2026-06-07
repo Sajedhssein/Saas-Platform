@@ -19,6 +19,8 @@ interface LoginResponse {
   // backend may return token as `token` or `access_token`
   token?: string;
   access_token?: string;
+  refresh_token?: string;
+  refresh_expires_at?: number;
   user?: RoleLike & Partial<User>;
   data?: {
     token?: string;
@@ -151,11 +153,12 @@ const mergeAuthUserFallback = (user: RoleLike & Partial<User> | undefined): Role
   };
 };
 
-const extractAuthData = (response: LoginResponse): { token?: string; user?: RoleLike & Partial<User> } => {
+const extractAuthData = (response: LoginResponse): { token?: string; refreshToken?: string; user?: RoleLike & Partial<User> } => {
   const nestedData = response.data;
 
   return {
     token: response.token ?? response.access_token ?? nestedData?.token ?? nestedData?.access_token,
+    refreshToken: response.refresh_token ?? nestedData?.refresh_token,
     user: response.user ?? nestedData?.user,
   };
 };
@@ -172,41 +175,6 @@ const splitFullName = (value: string): { first_name: string; last_name: string }
   const lastName = parts.join(' ');
 
   return { first_name: firstName, last_name: lastName };
-};
-
-const normalizeInviteUser = (user: InviteAcceptedUserResponse | undefined): User => {
-  if (!user) {
-    throw makeError('Invite acceptance did not return user data');
-  }
-
-  const normalizedUser = normalizeAuthUser(user);
-
-  if (!normalizedUser) {
-    throw makeError('Invite acceptance did not return a valid role');
-  }
-
-  const resolvedRole = resolveUserRole(normalizedUser);
-
-  if (import.meta.env.DEV) {
-    console.log('[auth/invite-accept] resolved role', {
-      user,
-      resolvedRole,
-      redirectPath: getDashboardPathForUser(normalizedUser),
-    });
-  }
-
-  const firstName = user.first_name?.trim() ?? '';
-  const lastName = user.last_name?.trim() ?? '';
-  const fallbackName = [firstName, lastName].filter(Boolean).join(' ').trim();
-
-  return {
-    id: user.id ?? '',
-    name: user.name?.trim() || fallbackName || user.email?.trim() || 'User',
-    email: user.email?.trim() ?? '',
-    avatar: user.avatar,
-    role: normalizedUser.role,
-    roles: user.roles,
-  };
 };
 
 const normalizeAuthResponseUser = (user: RoleLike & Partial<User> | undefined, fallbackError: string): User => {
@@ -276,7 +244,7 @@ export const authService = {
   /**
    * Login user with email and password
    */
-  login: async (credentials: LoginCredentials): Promise<{ token: string; user: User }> => {
+  login: async (credentials: LoginCredentials): Promise<{ token: string; refreshToken?: string; user: User }> => {
     try {
       logRequestPayload('login', credentials);
       const response = await api.post<LoginResponse>('/auth/login', credentials);
@@ -302,7 +270,7 @@ export const authService = {
         });
       }
 
-      return { token, user };
+      return { token, refreshToken: authData.refreshToken, user };
     } catch (error: unknown) {
       throw makeError(getErrorMessage(error, 'Login failed'), error);
     }
@@ -372,7 +340,10 @@ export const authService = {
       }
 
       // Support multiple response shapes: response.data.data, response.data.invite, or response.data
-      const raw = response.data as any;
+      const raw = response.data as InviteValidationResponse & {
+        invite?: Partial<InviteValidationData>;
+        data?: Partial<InviteValidationData>;
+      };
       const candidate = raw?.data ?? raw?.invite ?? raw;
 
       // Build a best-effort InviteValidationData — do not fail if some fields are missing
@@ -546,20 +517,57 @@ export const authService = {
     }
   },
 
+  uploadProfileAvatar: async (file: File): Promise<User> => {
+    try {
+      const formData = new FormData();
+      formData.append('avatar', file);
+
+      const response = await api.post<CurrentUserResponse>('/profile/avatar', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      const responseData = response.data as unknown;
+      const candidateUser = responseData && typeof responseData === 'object' && 'data' in (responseData as Record<string, unknown>)
+        ? (responseData as { data?: RoleLike & Partial<User> }).data
+        : responseData as RoleLike & Partial<User>;
+
+      return normalizeAuthResponseUser(candidateUser, 'Avatar upload did not return user data');
+    } catch (error: unknown) {
+      throw makeError(getErrorMessage(error, 'Failed to upload profile picture'), error);
+    }
+  },
+
+  dismissWelcome: async (): Promise<User> => {
+    try {
+      const response = await api.patch<CurrentUserResponse>('/profile/welcome-dismissed');
+      const responseData = response.data as unknown;
+      const candidateUser = responseData && typeof responseData === 'object' && 'data' in (responseData as Record<string, unknown>)
+        ? (responseData as { data?: RoleLike & Partial<User> }).data
+        : responseData as RoleLike & Partial<User>;
+
+      return normalizeAuthResponseUser(candidateUser, 'Welcome dismissal did not return user data');
+    } catch (error: unknown) {
+      throw makeError(getErrorMessage(error, 'Failed to dismiss welcome'), error);
+    }
+  },
+
   /**
    * Refresh authentication token
    */
-  refreshToken: async (): Promise<string> => {
+  refreshToken: async (refreshToken?: string): Promise<{ token: string; refreshToken?: string }> => {
     try {
-      const response = await api.post<LoginResponse>('/auth/refresh');
+      const response = await api.post<LoginResponse>('/auth/refresh', refreshToken ? { refresh_token: refreshToken } : undefined);
       const data = response.data as unknown as LoginResponse;
-      const token = extractAuthData(data).token;
+      const authData = extractAuthData(data);
+      const token = authData.token;
 
       if (!token) {
         throw makeError('Refresh token response missing token');
       }
 
-      return token;
+      return { token, refreshToken: authData.refreshToken };
     } catch (error: unknown) {
       throw makeError(getErrorMessage(error, 'Failed to refresh token'), error);
     }
@@ -591,9 +599,14 @@ export const authService = {
   /**
    * Reset password with token
    */
-  resetPassword: async (token: string, password: string, password_confirmation: string): Promise<void> => {
+  resetPassword: async (email: string, token: string, password: string, password_confirmation: string): Promise<void> => {
     try {
-      const payload = { token, password, password_confirmation };
+      const payload = {
+        email: email.trim(),
+        token,
+        password,
+        password_confirmation,
+      };
       logRequestPayload('resetPassword', payload);
 
       const response = await api.post<{ message?: string; data?: { message?: string } }>('/auth/reset-password', payload);
@@ -604,7 +617,12 @@ export const authService = {
     } catch (error: unknown) {
       const axiosError = error as AxiosError<{ message?: string; errors?: Record<string, unknown> }>;
       if (axiosError.response?.status === 422) {
-        logValidationFailure('resetPassword', { token, password, password_confirmation }, error);
+        logValidationFailure('resetPassword', {
+          email: email.trim(),
+          token,
+          password,
+          password_confirmation,
+        }, error);
       }
 
       throw makeError(getErrorMessage(error, 'Failed to reset password'), error);

@@ -6,7 +6,6 @@ namespace App\Http\Controllers\Api;
 use App\Events\ResponseSubmitted;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SubmitTaskResponseRequest;
-use App\Http\Resources\TaskFileResource;
 use App\Http\Resources\TaskResource;
 use App\Http\Resources\TaskResponseResource;
 use App\Models\Task;
@@ -86,17 +85,18 @@ class TaskController extends Controller
             ], 404);
         }
 
-        if (! request()->expectsJson() && ! request()->wantsJson()) {
-            return Storage::disk(config('filesystems.default'))->download(
+        if (request()->boolean('preview')) {
+            return Storage::disk(config('filesystems.default'))->response(
                 $taskFile->file_path,
-                $taskFile->file_name
+                $taskFile->file_name,
+                ['Content-Disposition' => 'inline; filename="'.$taskFile->file_name.'"']
             );
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => new TaskFileResource($taskFile),
-        ]);
+        return Storage::disk(config('filesystems.default'))->download(
+            $taskFile->file_path,
+            $taskFile->file_name
+        );
     }
 
     public function responses(Task $task): JsonResponse

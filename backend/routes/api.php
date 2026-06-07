@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\SearchController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\Client\ProjectController as ClientProjectController;
 use App\Http\Controllers\Api\Client\ReportController as ClientReportController;
@@ -35,12 +36,12 @@ Route::prefix('auth')->group(function () {
     Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:10,1');
     Route::get('/invite/{publicId}', [AuthInviteController::class, 'validateInvite'])->middleware('throttle:30,1');
     Route::post('/invite/accept', [AuthInviteController::class, 'accept'])->middleware('throttle:10,1');
+    Route::post('/refresh', [AuthController::class, 'refresh'])->middleware('throttle:10,1');
 
     Route::middleware(['auth:api', 'active'])->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
         Route::put('/me', [AuthController::class, 'updateMe']);
-        Route::post('/refresh', [AuthController::class, 'refresh'])->middleware('throttle:10,1');
     });
 });
 
@@ -58,14 +59,16 @@ Route::prefix('admin')->group(function () {
     Route::patch('/invites/{invite}/revoke', [AdminInviteController::class, 'revoke']);
     Route::patch('/invites/{invite}/restore', [AdminInviteController::class, 'restore']);
     Route::get('/employees', [EmployeeController::class, 'index']);
-        Route::put('/employees/{employee}', [EmployeeController::class, 'update']);
+    Route::put('/employees/{employee}', [EmployeeController::class, 'update']);
     Route::get('/employees/{employee}', [EmployeeController::class, 'show']);
     Route::post('/employees', [EmployeeController::class, 'store']);
+    Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy']);
     Route::post('/invites', [AdminInviteController::class, 'store']);
     Route::get('/clients', [ClientController::class, 'index']);
     Route::get('/clients/{client}', [ClientController::class, 'show']);
     Route::post('/clients', [ClientController::class, 'store']);
     Route::put('/clients/{client}', [ClientController::class, 'update']);
+    Route::delete('/clients/{client}', [ClientController::class, 'destroy']);
     Route::post('/users', [UserController::class, 'store']);
     Route::put('/users/{user}', [UserController::class, 'update']);
 
@@ -85,11 +88,6 @@ Route::prefix('admin')->group(function () {
     Route::delete('/projects/{project}', [ProjectController::class, 'destroy']);
 
     // Client management
-    Route::get('/clients', [ClientController::class, 'index']);
-    Route::get('/clients/{client}', [ClientController::class, 'show']);
-    Route::post('/clients', [ClientController::class, 'store']);
-    Route::put('/clients/{client}', [ClientController::class, 'update']);
-
     // Task management
     Route::post('/tasks', [AdminTaskController::class, 'store']);
     Route::get('/tasks', [AdminTaskController::class, 'index']);
@@ -127,12 +125,17 @@ Route::prefix('settings')->middleware(['auth:api', 'active'])->group(function ()
 });
 
 Route::middleware(['auth:api', 'active'])->group(function () {
+    Route::get('/search', [SearchController::class, 'index']);
+
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::put('/profile', [ProfileController::class, 'update']);
+    Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar']);
+    Route::patch('/profile/welcome-dismissed', [ProfileController::class, 'dismissWelcome']);
 
     Route::get('/employee/dashboard', [EmployeeDashboardController::class, 'show']);
     Route::get('/employee/projects', [EmployeeProjectController::class, 'index']);
     Route::get('/employee/tasks', [EmployeeTaskController::class, 'index']);
+    Route::patch('/employee/tasks/{task}/status', [EmployeeTaskController::class, 'updateStatus']);
     Route::get('/tasks/assigned', [TaskController::class, 'assigned']);
     Route::get('/tasks/{task}', [TaskController::class, 'show']);
     Route::get('/tasks/{task}/files/{taskFile}', [TaskController::class, 'showFile']);
@@ -147,6 +150,7 @@ Route::middleware(['auth:api', 'active'])->group(function () {
 
     // Activity logs
     Route::get('/activity-logs', [ActivityLogController::class, 'index']);
+    Route::delete('/activity-logs', [ActivityLogController::class, 'clear']);
     Route::get('/tasks/{task}/activity-logs', [ActivityLogController::class, 'taskLogs']);
 
     // Dashboard analytics (admin only)
@@ -167,11 +171,11 @@ Route::middleware(['auth:api', 'active'])->group(function () {
     // Notifications
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::patch('/notifications/clear', [NotificationController::class, 'clear']);
-    Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markAsRead']);
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+    Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markAsRead']);
     // also support PUT for clients that use PUT semantics
-    Route::put('/notifications/{notification}/read', [NotificationController::class, 'markAsRead']);
     Route::put('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+    Route::put('/notifications/{notification}/read', [NotificationController::class, 'markAsRead']);
 });
 
 // Client portal - read-only client routes
@@ -186,4 +190,3 @@ Route::middleware(['auth:api', 'active', 'role:client'])->prefix('client')->grou
     Route::get('/reports/{report}', [ClientReportController::class, 'show']);
     Route::get('/files', [ClientFileController::class, 'index']);
 });
-

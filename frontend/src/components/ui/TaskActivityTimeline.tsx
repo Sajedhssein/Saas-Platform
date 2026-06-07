@@ -13,8 +13,9 @@ import {
     Loader2,
 } from 'lucide-react';
 import { taskService, TASK_MUTATION_EVENT } from '../../services/taskService';
-import { formatDate, formatRelativeTime, getInitials } from '../../utils/formatters';
+import { formatDate, formatRelativeTime } from '../../utils/formatters';
 import type { ActivityLog } from '../../types/activity';
+import { Avatar } from './Avatar';
 
 interface TaskActivityTimelineProps {
     taskId: string;
@@ -102,18 +103,6 @@ const resolveTone = (action: string): ActivityTone => {
     }
 
     return { icon: <Clock3 size={16} />, iconClassName: 'text-slate-600', accentClassName: 'bg-slate-50 text-slate-700 ring-slate-200' };
-};
-
-const resolveAvatarFallbackClass = (name: string): string => {
-    const hash = Array.from(name).reduce((sum, character) => sum + character.charCodeAt(0), 0);
-    const palettes = [
-        'from-cyan-500 to-blue-600',
-        'from-emerald-500 to-teal-600',
-        'from-violet-500 to-indigo-600',
-        'from-amber-500 to-orange-600',
-    ];
-
-    return palettes[hash % palettes.length];
 };
 
 const SkeletonRow = () => (
@@ -284,7 +273,6 @@ export const TaskActivityTimeline = ({ taskId, className }: TaskActivityTimeline
                                             const tone = resolveTone(log.action);
                                             const activityUser = log.user;
                                             const avatarName = activityUser?.name ?? 'Activity';
-                                            const avatarFallback = getInitials(avatarName || 'Activity');
                                             const description = log.description || getActionLabel(log.action);
 
                                             return (
@@ -304,17 +292,7 @@ export const TaskActivityTimeline = ({ taskId, className }: TaskActivityTimeline
                                                         <div className="min-w-0 space-y-2">
                                                             <div className="flex items-center gap-3">
                                                                 <div className="flex items-center gap-3">
-                                                                    <div className={`flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-linear-to-br ${resolveAvatarFallbackClass(avatarName)} text-xs font-semibold text-white shadow-sm`}>
-                                                                        {activityUser?.avatar ? (
-                                                                            <img
-                                                                                src={activityUser.avatar}
-                                                                                alt={activityUser.name}
-                                                                                className="h-full w-full object-cover"
-                                                                            />
-                                                                        ) : (
-                                                                            avatarFallback
-                                                                        )}
-                                                                    </div>
+                                                                    <Avatar imageUrl={activityUser?.avatar} name={avatarName} size="sm" className="h-9 w-9" />
                                                                     <div>
                                                                         <p className="text-sm font-semibold text-slate-900">
                                                                             {activityUser?.name ?? 'System'}

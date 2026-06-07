@@ -6,6 +6,8 @@ import { authService } from '../../services/authService';
 import type { AxiosError } from 'axios';
 import logo from '../../assets/WhatsApp_Image_2023-10-18_at_18.48.30_3f0dc5e9-removebg-preview (1).png';
 
+const PASSWORD_RESET_EMAIL_KEY = 'password_reset_email';
+
 export const ForgotPassword = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -25,11 +27,13 @@ export const ForgotPassword = () => {
     setIsLoading(true);
 
     try {
-      await authService.requestPasswordReset(email);
+      const resetEmail = email.trim();
+      await authService.requestPasswordReset(resetEmail);
+      localStorage.setItem(PASSWORD_RESET_EMAIL_KEY, resetEmail);
       setSuccess(true);
 
       if (import.meta.env.DEV) {
-        console.log('[auth/forgot-password] reset link sent', { email });
+        console.log('[auth/forgot-password] reset link sent', { email: resetEmail });
       }
 
       // Auto-redirect to login after 5 seconds

@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Button, Input } from '../../components/ui';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Lock, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Mail, Lock, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { authService } from '../../services/authService';
 import type { AxiosError } from 'axios';
 import logo from '../../assets/WhatsApp_Image_2023-10-18_at_18.48.30_3f0dc5e9-removebg-preview (1).png';
 
+const PASSWORD_RESET_EMAIL_KEY = 'password_reset_email';
+
 interface ValidationErrors {
+  email?: string[];
   password?: string[];
   password_confirmation?: string[];
 }
@@ -16,9 +19,11 @@ export const ResetPassword = () => {
   const { token: paramToken } = useParams<{ token: string }>();
   const [searchParams] = useSearchParams();
   const queryToken = searchParams.get('token');
+  const queryEmail = searchParams.get('email');
   
   // Support both URL param (/reset-password/{token}) and query param (/reset-password?token=...)
   const token = paramToken || queryToken;
+  const [email, setEmail] = useState(() => queryEmail || localStorage.getItem(PASSWORD_RESET_EMAIL_KEY) || '');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -32,14 +37,27 @@ export const ResetPassword = () => {
     return () => clearTimeout(id);
   }, [error]);
 
+  useEffect(() => {
+    if (!queryEmail?.trim()) return;
+    localStorage.setItem(PASSWORD_RESET_EMAIL_KEY, queryEmail.trim());
+  }, [queryEmail]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setFieldErrors({});
     setIsLoading(true);
 
+    const resetEmail = email.trim();
+
     if (!token) {
       setError('Invalid reset token. Please try again.');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!resetEmail) {
+      setFieldErrors({ email: ['Email is required to reset your password.'] });
       setIsLoading(false);
       return;
     }
@@ -51,11 +69,25 @@ export const ResetPassword = () => {
     }
 
     try {
-      await authService.resetPassword(token, password, passwordConfirm);
+      const payload = {
+        email: resetEmail,
+        token,
+        password,
+        password_confirmation: passwordConfirm,
+      };
+
+      if (import.meta.env.DEV) {
+        console.log('[auth/reset-password] final payload', payload);
+        console.log('[auth/reset-password] email value', resetEmail);
+        console.log('[auth/reset-password] token value', token);
+      }
+
+      await authService.resetPassword(resetEmail, token, password, passwordConfirm);
+      localStorage.removeItem(PASSWORD_RESET_EMAIL_KEY);
       setSuccess(true);
 
       if (import.meta.env.DEV) {
-        console.log('[auth/reset-password] password reset successful', { token });
+        console.log('[auth/reset-password] password reset successful', { email: resetEmail, token });
       }
 
       // Auto-redirect to login after 5 seconds
@@ -213,6 +245,20 @@ export const ResetPassword = () => {
               )}
 
               <Input
+                label="Email Address"
+                type="email"
+                placeholder="name@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                icon={<Mail size={18} />}
+                required
+                disabled={isLoading}
+                labelClassName="text-white"
+                className="bg-white border-slate-200 text-slate-900 placeholder:text-slate-500 focus:ring-cyan-400"
+                error={fieldErrors.email?.[0]}
+              />
+
+              <Input
                 label="New Password"
                 type="password"
                 placeholder="Enter new password"
@@ -243,7 +289,7 @@ export const ResetPassword = () => {
               <Button
                 type="submit"
                 isLoading={isLoading}
-                disabled={isLoading || !password || !passwordConfirm}
+                disabled={isLoading || !email.trim() || !password || !passwordConfirm}
                 className="w-full bg-linear-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-slate-950 shadow-lg shadow-cyan-500/20"
               >
                 {isLoading ? 'Resetting...' : 'Reset Password'}

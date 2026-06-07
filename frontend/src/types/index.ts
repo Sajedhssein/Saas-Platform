@@ -1,4 +1,5 @@
 import type { Project } from './project';
+import type { TaskStatus } from './task';
 
 export interface User {
     id: string;
@@ -6,11 +7,15 @@ export interface User {
     email: string;
     avatar?: string;
     company?: string;
+    company_name?: string;
     phone?: string;
     department?: string;
     position?: string;
     role: 'admin' | 'employee' | 'client';
     roles?: Array<{ name?: string | null; slug?: string | null; role?: string | null } | string> | string[];
+    first_login_at?: string | null;
+    last_login_at?: string | null;
+    show_welcome?: boolean;
 }
 
 export type { Project, ProjectEmployeeRef } from './project';
@@ -50,6 +55,21 @@ export interface Employee {
     avatar: string;
     performance: number;
     completedTasks: number;
+    totalAssignedTasks?: number;
+    inProgressTasks?: number;
+    todoTasks?: number;
+    completionRate?: number;
+    activeTasks?: Array<{
+        id: string;
+        title: string;
+        status: TaskStatus;
+        progress?: number;
+        deadline?: string | null;
+        project?: {
+            id: string;
+            name: string;
+        } | null;
+    }>;
     department: string;
 }
 

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ActivityLogResource;
+use App\Models\ActivityLog;
 use App\Models\Project;
 use App\Models\Role;
 use App\Models\Task;
@@ -130,6 +132,14 @@ class DashboardController extends Controller
                     'completed' => $completed,
                 ])
                 ->values(),
+            'recent_activity' => ActivityLogResource::collection(
+                ActivityLog::query()
+                    ->forCompany($companyId)
+                    ->with('user:id,name,email,avatar_url')
+                    ->latestFirst()
+                    ->limit(8)
+                    ->get()
+            ),
         ];
 
         return response()->json($stats);

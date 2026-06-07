@@ -82,12 +82,23 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
     },
 
     markAllAsRead: async () => {
-        await notificationService.markAllAsRead();
+        const previousNotifications = get().notifications;
+        const previousUnreadCount = get().unreadCount;
 
         set((state) => ({
             notifications: state.notifications.map(markNotificationReadLocally),
             unreadCount: 0,
         }));
+
+        try {
+            await notificationService.markAllAsRead();
+        } catch (error) {
+            set({
+                notifications: previousNotifications,
+                unreadCount: previousUnreadCount,
+            });
+            throw error;
+        }
     },
 
     clearNotifications: async () => {

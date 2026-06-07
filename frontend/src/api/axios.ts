@@ -9,6 +9,12 @@ interface RetryableRequestConfig extends InternalAxiosRequestConfig {
 interface LoginResponse {
   token?: string;
   access_token?: string;
+  refresh_token?: string;
+  data?: {
+    token?: string;
+    access_token?: string;
+    refresh_token?: string;
+  };
 }
 
 const getBaseURL = (): string | undefined => {
@@ -28,6 +34,46 @@ const api = axios.create({
 let refreshPromise: Promise<string> | null = null;
 let logoutPromise: Promise<void> | null = null;
 
+const ACCESS_TOKEN_KEY = 'token';
+const REFRESH_TOKEN_KEY = 'refresh_token';
+const AUTH_STORAGE_KEY = 'auth_storage';
+
+type AuthStorageType = 'local' | 'session';
+
+const getAuthStorageType = (): AuthStorageType => {
+  const savedType = localStorage.getItem(AUTH_STORAGE_KEY);
+
+  if (savedType === 'local' || savedType === 'session') {
+    return savedType;
+  }
+
+  return localStorage.getItem(ACCESS_TOKEN_KEY) ? 'local' : 'session';
+};
+
+const getAuthStorage = (): Storage => (getAuthStorageType() === 'local' ? localStorage : sessionStorage);
+
+const getStoredValue = (key: string): string | null => {
+  const storageValue = getAuthStorage().getItem(key);
+  return storageValue ?? localStorage.getItem(key) ?? sessionStorage.getItem(key);
+};
+
+const setStoredValue = (key: string, value: string): void => {
+  getAuthStorage().setItem(key, value);
+};
+
+const clearAuthStorage = (): void => {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_STORAGE_KEY);
+  sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+  sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+};
+
+const extractTokenData = (data: LoginResponse): { token?: string; refreshToken?: string } => ({
+  token: data.token ?? data.access_token ?? data.data?.token ?? data.data?.access_token,
+  refreshToken: data.refresh_token ?? data.data?.refresh_token,
+});
+
 const isAuthEndpoint = (url?: string): boolean => {
   if (!url) {
     return false;
@@ -42,10 +88,8 @@ const applyBearerToken = (config: RetryableRequestConfig, token: string): void =
     return;
   }
 
-  config.headers = AxiosHeaders.from({
-    ...(config.headers ?? {}),
-    Authorization: `Bearer ${token}`,
-  });
+  config.headers = AxiosHeaders.from(config.headers ?? {});
+  config.headers.set('Authorization', `Bearer ${token}`);
 };
 
 const logoutAndRedirect = async (): Promise<void> => {
@@ -54,7 +98,7 @@ const logoutAndRedirect = async (): Promise<void> => {
   }
 
   logoutPromise = (async () => {
-    localStorage.removeItem('token');
+    clearAuthStorage();
 
     try {
       const { default: useAuthStore } = await import('../store/authStore');
@@ -74,20 +118,30 @@ const logoutAndRedirect = async (): Promise<void> => {
 };
 
 const refreshAccessToken = async (): Promise<string> => {
+  const storedRefreshToken = getStoredValue(REFRESH_TOKEN_KEY);
+
+  if (!storedRefreshToken || storedRefreshToken === 'undefined' || storedRefreshToken === 'null') {
+    throw new Error('No refresh token available');
+  }
+
   if (!refreshPromise) {
     refreshPromise = api
-      .post<LoginResponse>('/auth/refresh', undefined, {
+      .post<LoginResponse>('/auth/refresh', { refresh_token: storedRefreshToken }, {
         _skipAuthRefresh: true,
       } as RetryableRequestConfig)
       .then((response) => {
-        const data = response.data;
-        const token = data.token ?? data.access_token;
+        const { token, refreshToken } = extractTokenData(response.data);
 
         if (!token) {
           throw new Error('Refresh token response missing token');
         }
 
-        localStorage.setItem('token', token);
+        setStoredValue(ACCESS_TOKEN_KEY, token);
+
+        if (refreshToken) {
+          setStoredValue(REFRESH_TOKEN_KEY, refreshToken);
+        }
+
         return token;
       })
       .finally(() => {
@@ -99,7 +153,7 @@ const refreshAccessToken = async (): Promise<string> => {
 };
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = getStoredValue(ACCESS_TOKEN_KEY);
   // TEMP DEBUG: log token and request URL for auth initialization debugging
   try {
     console.debug('[api.request] token:', token, 'baseURL:', api.defaults.baseURL, 'url:', config?.url);
@@ -146,9 +200,13 @@ api.interceptors.response.use(
     const shouldSkipRefresh = Boolean(originalRequest?._skipAuthRefresh) || isAuthEndpoint(requestUrl);
 
     if (status === 401 && originalRequest && !originalRequest._retry && !shouldSkipRefresh) {
-      const currentToken = localStorage.getItem('token');
+      const currentToken = getStoredValue(ACCESS_TOKEN_KEY);
+      const currentRefreshToken = getStoredValue(REFRESH_TOKEN_KEY);
 
-      if (!currentToken || currentToken === 'undefined' || currentToken === 'null') {
+      if (
+        (!currentToken || currentToken === 'undefined' || currentToken === 'null') &&
+        (!currentRefreshToken || currentRefreshToken === 'undefined' || currentRefreshToken === 'null')
+      ) {
         await logoutAndRedirect();
         return Promise.reject(error);
       }

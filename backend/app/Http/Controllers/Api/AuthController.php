@@ -43,6 +43,7 @@ class AuthController extends Controller
         });
 
         $token = auth('api')->login($user);
+        $user->forceFill(['last_login_at' => now()])->save();
 
         // create refresh token
         $refresh = $this->refreshTokenService->createForUser($user, $request->userAgent() ?? null, $request->ip());
@@ -73,6 +74,7 @@ class AuthController extends Controller
         }
 
         $user = auth('api')->user();
+        $user->forceFill(['last_login_at' => now()])->save();
         $refresh = $this->refreshTokenService->createForUser($user, $request->userAgent() ?? null, $request->ip());
 
         return $this->respondWithToken($token, UserResource::make($user), $refresh['plain'], optional($refresh['model']->expires_at)->getTimestamp());
@@ -128,8 +130,12 @@ class AuthController extends Controller
         $plain = $request->input('refresh_token');
         if (! $plain) {
             // fallback to legacy JWT refresh
-            $token = auth('api')->refresh();
-            return $this->respondWithToken($token, UserResource::make(auth('api')->user()));
+            try {
+                $token = auth('api')->refresh();
+                return $this->respondWithToken($token, UserResource::make(auth('api')->user()));
+            } catch (\Throwable $e) {
+                return response()->json(['success' => false, 'message' => 'Refresh token is required.'], 401);
+            }
         }
 
         $model = $this->refreshTokenService->findByPlain($plain);
@@ -150,6 +156,7 @@ class AuthController extends Controller
         $this->refreshTokenService->revoke($model);
 
         $token = auth('api')->login($user);
+        $user->forceFill(['last_login_at' => now()])->save();
         $refresh = $this->refreshTokenService->createForUser($user, $request->userAgent() ?? null, $request->ip());
 
         return $this->respondWithToken($token, UserResource::make($user), $refresh['plain'], optional($refresh['model']->expires_at)->getTimestamp());

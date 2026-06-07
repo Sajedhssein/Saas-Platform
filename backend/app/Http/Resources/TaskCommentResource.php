@@ -18,6 +18,7 @@ class TaskCommentResource extends JsonResource
                 'avatar_url' => $this->user->avatar_url,
             ],
             'content' => $this->comment,
+            'attachment' => $this->whenLoaded('attachment', fn () => new TaskFileResource($this->attachment)),
             'is_edited' => $this->is_edited,
             'edited_at' => $this->is_edited ? $this->updated_at?->toDateTimeString() : null,
             'created_at' => $this->created_at?->toDateTimeString(),

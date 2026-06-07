@@ -37,6 +37,8 @@ class User extends Authenticatable implements JWTSubject
         'status',
         'is_active',
         'phone',
+        'first_login_at',
+        'last_login_at',
     ];
 
     protected $hidden = [
@@ -48,6 +50,8 @@ class User extends Authenticatable implements JWTSubject
         'password' => 'hashed',
         'token_invalidated_at' => 'datetime',
         'is_active' => 'boolean',
+        'first_login_at' => 'datetime',
+        'last_login_at' => 'datetime',
     ];
 
     protected static function booted(): void
@@ -136,6 +140,11 @@ class User extends Authenticatable implements JWTSubject
             ->using(TaskUser::class)
             ->withPivot('role')
             ->withTimestamps();
+    }
+
+    public function activeTasks()
+    {
+        return $this->tasks()->whereIn('status', ['pending', 'in_progress']);
     }
 
     public function taskComments() {

@@ -15,6 +15,7 @@ class StoreTaskCommentRequest extends FormRequest
     {
         return [
             'content' => ['required', 'string', 'min:1', 'max:5000'],
+            'attachment' => ['nullable', 'file', 'max:10240'],
         ];
     }
 
